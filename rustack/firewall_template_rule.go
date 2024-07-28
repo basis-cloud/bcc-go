@@ -29,7 +29,6 @@ func NewFirewallRule(name string, destinationIp string, direction string, protoc
 	return d
 }
 
-
 func (f *FirewallTemplate) CreateFirewallRule(firewallRule *FirewallRule) (err error) {
 	args := &struct {
 		manager         *Manager
@@ -84,7 +83,6 @@ func (m *Manager) GetFirewallRules(id string) (firewallRules []*FirewallRule, er
 	}
 	return
 }
-
 
 func (f *FirewallRule) Update() (err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.TemplateId, f.ID)
