@@ -1,4 +1,4 @@
-module github.com/rustack-cloud-platform/rcp-go
+module github.com/basis-cloud/bcc-go
 
 go 1.21
 
