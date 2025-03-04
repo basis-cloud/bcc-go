@@ -11,10 +11,11 @@ type Platform struct {
 	Hypervisor *Hypervisor `json:"hypervisor"`
 }
 
-func (m *Manager) GetPlatforms(vdc_id string) (platforms []*Platform, err error) {
+func (m *Manager) GetPlatforms(vdc_id string, extraArgs ...Arguments) (platforms []*Platform, err error) {
 	args := Arguments{
 		"vdc": vdc_id,
 	}
+	args.merge(extraArgs)
 
 	path := "v1/platform"
 	err = m.Get(path, args, &platforms)

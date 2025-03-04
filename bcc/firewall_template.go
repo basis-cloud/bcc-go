@@ -23,10 +23,11 @@ func (m *Manager) GetFirewallTemplate(id string) (firewallTemplate *FirewallTemp
 	return
 }
 
-func (v *Vdc) GetFirewallTemplates() (firewallTemplate []*FirewallTemplate, err error) {
+func (v *Vdc) GetFirewallTemplates(extraArgs ...Arguments) (firewallTemplate []*FirewallTemplate, err error) {
 	args := Arguments{
 		"vdc": v.ID,
 	}
+	args.merge(extraArgs)
 
 	path := "v1/firewall"
 	err = v.manager.GetItems(path, args, &firewallTemplate)

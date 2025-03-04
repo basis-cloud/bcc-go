@@ -13,10 +13,11 @@ type KubernetesTemplate struct {
 	MinNodeHdd int    `json:"min_node_hdd"`
 }
 
-func (v *Vdc) GetKubernetesTemplates() (templates []*KubernetesTemplate, err error) {
+func (v *Vdc) GetKubernetesTemplates(extraArgs ...Arguments) (templates []*KubernetesTemplate, err error) {
 	args := Arguments{
 		"vdc": v.ID,
 	}
+	args.merge(extraArgs)
 
 	path := "/v1/kubernetes_template"
 	err = v.manager.GetItems(path, args, &templates)

@@ -75,9 +75,11 @@ func (f *FirewallTemplate) GetRuleById(firewallRuleId string) (firewallRule *Fir
 	return
 }
 
-func (m *Manager) GetFirewallRules(id string) (firewallRules []*FirewallRule, err error) {
+func (m *Manager) GetFirewallRules(id string, extraArgs ...Arguments) (firewallRules []*FirewallRule, err error) {
+	args := Defaults()
+	args.merge(extraArgs)
 	path := fmt.Sprintf("v1/firewall/%s/rule", id)
-	err = m.Get(path, Defaults(), &firewallRules)
+	err = m.Get(path, args, &firewallRules)
 	if err != nil {
 		return
 	}
