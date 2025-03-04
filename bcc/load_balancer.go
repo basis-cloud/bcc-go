@@ -279,9 +279,11 @@ func (lb *LoadBalancer) GetLoadBalancerPool(id string) (lbaas_pool LoadBalancerP
 	return
 }
 
-func (lb *LoadBalancer) GetPools() (pools []*LoadBalancerPool, err error) {
+func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerPool, err error) {
+	args := Defaults()
+	args.merge(extraArgs)
 	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
-	err = lb.manager.GetSubItems(path, Arguments{}, &pools)
+	err = lb.manager.GetSubItems(path, args, &pools)
 	return pools, err
 }
 

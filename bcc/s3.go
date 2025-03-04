@@ -127,8 +127,9 @@ func (s3 *S3Storage) CreateBucket(bucket *S3StorageBucket) (err error) {
 	return
 }
 
-func (m *Manager) GetBuckets(s3_id string) (buckets []*S3StorageBucket, err error) {
+func (m *Manager) GetBuckets(s3_id string, extraArgs ...Arguments) (buckets []*S3StorageBucket, err error) {
 	args := Defaults()
+	args.merge(extraArgs)
 
 	path := fmt.Sprintf("v1/s3_storage/%s/bucket", s3_id)
 	err = m.GetItems(path, args, &buckets)
@@ -138,8 +139,8 @@ func (m *Manager) GetBuckets(s3_id string) (buckets []*S3StorageBucket, err erro
 	return
 }
 
-func (s3 *S3Storage) GetBuckets() (buckets []*S3StorageBucket, err error) {
-	buckets, err = s3.manager.GetBuckets(s3.ID)
+func (s3 *S3Storage) GetBuckets(extraArgs ...Arguments) (buckets []*S3StorageBucket, err error) {
+	buckets, err = s3.manager.GetBuckets(s3.ID, extraArgs...)
 	if err != nil {
 		return nil, err
 	}

@@ -65,7 +65,9 @@ func (r *Router) GetFirewallRuleById(firewallRuleId string) (firewallRule *Route
 	return
 }
 
-func (r *Router) GetFirewallRules() (firewallRules []*RouterFirewallRule, err error) {
+func (r *Router) GetFirewallRules(extraArgs ...Arguments) (firewallRules []*RouterFirewallRule, err error) {
+	args := Defaults()
+	args.merge(extraArgs)
 	path := fmt.Sprintf("v1/router/%s/firewall_rule", r.ID)
 	err = r.manager.Get(path, Defaults(), &firewallRules)
 	if err != nil {

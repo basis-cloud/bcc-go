@@ -23,10 +23,11 @@ func (m *Manager) GetTemplate(id string) (template *Template, err error) {
 	return
 }
 
-func (v *Vdc) GetTemplates() (templates []*Template, err error) {
+func (v *Vdc) GetTemplates(extraArgs ...Arguments) (templates []*Template, err error) {
 	args := Arguments{
 		"vdc": v.ID,
 	}
+	args.merge(extraArgs)
 
 	path := "v1/template"
 	err = v.manager.Get(path, args, &templates)

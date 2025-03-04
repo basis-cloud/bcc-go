@@ -11,10 +11,11 @@ type StorageProfile struct {
 	MaxDiskSize int    `json:"max_disk_size"`
 }
 
-func (v *Vdc) GetStorageProfiles() (storageProfiles []*StorageProfile, err error) {
+func (v *Vdc) GetStorageProfiles(extraArgs ...Arguments) (storageProfiles []*StorageProfile, err error) {
 	args := Arguments{
 		"vdc": v.ID,
 	}
+	args.merge(extraArgs)
 
 	path := "v1/storage_profile"
 	err = v.manager.GetItems(path, args, &storageProfiles)

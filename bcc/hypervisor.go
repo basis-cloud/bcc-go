@@ -11,7 +11,7 @@ type Hypervisor struct {
 	Type    string `json:"type"`
 }
 
-func (p *Project) GetAvailableHypervisors() (hypervisors []*Hypervisor, err error) {
+func (p *Project) GetAvailableHypervisors(extraArgs ...Arguments) (hypervisors []*Hypervisor, err error) {
 	type tempType struct {
 		Client struct {
 			AllowedHypervisors []*Hypervisor `json:"allowed_hypervisors"`
@@ -19,9 +19,11 @@ func (p *Project) GetAvailableHypervisors() (hypervisors []*Hypervisor, err erro
 	}
 
 	var target tempType
+	args := Defaults()
+	args.merge(extraArgs)
 
 	path, _ := url.JoinPath("v1/project", p.ID)
-	err = p.manager.Get(path, Defaults(), &target)
+	err = p.manager.Get(path, args, &target)
 	hypervisors = target.Client.AllowedHypervisors
 
 	for i := range hypervisors {

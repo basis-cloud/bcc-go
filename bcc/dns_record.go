@@ -24,8 +24,9 @@ func NewDnsRecord(data string, flag int, host string, port int, priority int, ta
 	return d
 }
 
-func (m *Manager) GetDnsRecords(dns_id string) (dns_records []*DnsRecord, err error) {
+func (m *Manager) GetDnsRecords(dns_id string, extraArgs ...Arguments) (dns_records []*DnsRecord, err error) {
 	args := Defaults()
+	args.merge(extraArgs)
 
 	path := fmt.Sprintf("v1/dns/%s/dns_record", dns_id)
 	err = m.GetItems(path, args, &dns_records)
@@ -35,8 +36,8 @@ func (m *Manager) GetDnsRecords(dns_id string) (dns_records []*DnsRecord, err er
 	return
 }
 
-func (d *Dns) GetDnsRecords() (dns_record []*DnsRecord, err error) {
-	dns_record, err = d.manager.GetDnsRecords(d.ID)
+func (d *Dns) GetDnsRecords(extraArgs ...Arguments) (dns_record []*DnsRecord, err error) {
+	dns_record, err = d.manager.GetDnsRecords(d.ID, extraArgs...)
 	if err != nil {
 		return nil, err
 	}

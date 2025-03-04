@@ -39,9 +39,10 @@ type PaasService struct {
 	Locked          bool                   `json:"locked"`
 }
 
-func (m *Manager) GetPaasTemplates(projectId string) ([]*PaasTemplate, error) {
+func (m *Manager) GetPaasTemplates(projectId string, extraArgs ...Arguments) ([]*PaasTemplate, error) {
 	var templates []*PaasTemplate
 	args := Arguments{"project_id": projectId}
+	args.merge(extraArgs)
 	path := "v1/paas_template"
 	if err := m.GetItems(path, args, &templates); err != nil {
 		return nil, err
@@ -63,12 +64,13 @@ func (m *Manager) GetPaasTemplate(id int, projectId string) (*PaasTemplate, erro
 	return template, nil
 }
 
-func (p *PaasTemplate) GetPaasTemplateInputs(projectId string) ([]*PaasInputDescription, error) {
+func (p *PaasTemplate) GetPaasTemplateInputs(projectId string, extraArgs ...Arguments) ([]*PaasInputDescription, error) {
 	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(p.ID), "inputs")
 	response := struct {
 		Inputs []*PaasInputDescription `json:"inputs"`
 	}{}
 	args := Arguments{"project_id": projectId}
+	args.merge(extraArgs)
 	if err := p.manager.Request("GET", path, args, &response); err != nil {
 		return nil, err
 	}

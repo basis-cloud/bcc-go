@@ -91,9 +91,11 @@ func (n *Network) Update() error {
 	return n.manager.Request("PUT", path, args, n)
 }
 
-func (n *Network) GetSubnets() (subnets []*Subnet, err error) {
+func (n *Network) GetSubnets(extraArgs ...Arguments) (subnets []*Subnet, err error) {
+	args := Defaults()
+	args.merge(extraArgs)
 	path := fmt.Sprintf("v1/network/%s/subnet", n.ID)
-	err = n.manager.GetItems(path, Arguments{}, &subnets)
+	err = n.manager.GetItems(path, args, &subnets)
 	for i := range subnets {
 		subnets[i].manager = n.manager
 		subnets[i].network = n
