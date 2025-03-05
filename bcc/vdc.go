@@ -11,6 +11,11 @@ type Vdc struct {
 	Locked     bool       `json:"locked"`
 	Hypervisor Hypervisor `json:"hypervisor"`
 
+	Paas *struct {
+		ID     string `json:"id"`
+		Locked bool   `json:"locked"`
+	} `json:"paas"`
+
 	Project struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`

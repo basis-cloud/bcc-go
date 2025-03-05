@@ -16,20 +16,28 @@ type PaasInputDescription struct {
 }
 
 type PaasTemplate struct {
-	manager     *Manager
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	manager      *Manager
+	ID           int      `json:"id"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	DisplayName  string   `json:"display_name"`
+	Tenant       string   `json:"tenant"`
+	Base64Icon   string   `json:"base64_icon"`
+	PlatformTags []string `json:"platform_tags"`
+	Platforms    []int    `json:"platforms"`
+	Tags         []string `json:"tags"`
+
+	PublishedToShowcase bool `json:"published_to_showcase"`
 }
 
 type PaasService struct {
 	manager *Manager
 	ID      string `json:"id"`
 	Name    string `json:"name"`
-	Project struct {
+	Vdc     struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
-	} `json:"project"`
+	} `json:"vdc"`
 	PaasDeployID    int                    `json:"paas_deploy_id,omitempty"`
 	PaasServiceID   int                    `json:"paas_service_id"`
 	PaasServiceName string                 `json:"paas_service_name"`
@@ -39,9 +47,20 @@ type PaasService struct {
 	Locked          bool                   `json:"locked"`
 }
 
-func (m *Manager) GetPaasTemplates(projectId string, extraArgs ...Arguments) ([]*PaasTemplate, error) {
+func (m *Manager) CreatePaasLocation(vdcId string) error {
+	args := struct {
+		Vdc string `json:"vdc"`
+	}{
+		Vdc: vdcId,
+	}
+	path := "v1/paas"
+	err := m.Request("POST", path, args, nil)
+	return err
+}
+
+func (m *Manager) GetPaasTemplates(vdcId string, extraArgs ...Arguments) ([]*PaasTemplate, error) {
 	var templates []*PaasTemplate
-	args := Arguments{"project_id": projectId}
+	args := Arguments{"vdc_id": vdcId}
 	args.merge(extraArgs)
 	path := "v1/paas_template"
 	if err := m.GetItems(path, args, &templates); err != nil {
@@ -53,9 +72,9 @@ func (m *Manager) GetPaasTemplates(projectId string, extraArgs ...Arguments) ([]
 	return templates, nil
 }
 
-func (m *Manager) GetPaasTemplate(id int, projectId string) (*PaasTemplate, error) {
+func (m *Manager) GetPaasTemplate(id int, vdcId string) (*PaasTemplate, error) {
 	var template *PaasTemplate
-	args := Arguments{"project_id": projectId}
+	args := Arguments{"vdc_id": vdcId}
 	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(id))
 	if err := m.Get(path, args, &template); err != nil {
 		return nil, err
@@ -102,12 +121,12 @@ func (m *Manager) GetPaasService(id string) (*PaasService, error) {
 func (m *Manager) CreatePaasService(p *PaasService) error {
 	args := struct {
 		Name          string                 `json:"name"`
-		Project       string                 `json:"project"`
+		Vdc           string                 `json:"vdc"`
 		PaasServiceID int                    `json:"paas_service_id"`
 		Inputs        map[string]interface{} `json:"paas_service_inputs"`
 	}{
 		Name:          p.Name,
-		Project:       p.Project.ID,
+		Vdc:           p.Vdc.ID,
 		PaasServiceID: p.PaasServiceID,
 		Inputs:        p.Inputs,
 	}
@@ -120,7 +139,24 @@ func (m *Manager) CreatePaasService(p *PaasService) error {
 	return nil
 }
 
+func (p *PaasService) Update() error {
+	args := struct {
+		Name          string                 `json:"name"`
+		Inputs        map[string]interface{} `json:"paas_service_inputs"`
+	}{
+		Name:          p.Name,
+		Inputs:        p.Inputs,
+	}
+	path, _ := url.JoinPath("v1/paas_service", p.ID)
+	return p.manager.Request("PUT", path, args, p)
+}
+
 func (m *Manager) DeletePaasService(id string) error {
 	path, _ := url.JoinPath("v1/paas_service", id)
 	return m.Delete(path, Defaults(), nil)
+}
+
+func (p PaasService) WaitLock() (err error) {
+	path, _ := url.JoinPath("v1/paas_service", p.ID)
+	return loopWaitLock(p.manager, path)
 }
