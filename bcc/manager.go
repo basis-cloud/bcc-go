@@ -3,6 +3,8 @@ package bcc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,6 +38,18 @@ type Manager struct {
 	ctx       context.Context
 }
 
+func loadCertificatesFromFile(CertPath string) (*x509.CertPool, error) {
+	certPool := x509.NewCertPool()
+	certData, err := os.ReadFile(CertPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error with open cert by path %s ", CertPath)
+	}
+	if !certPool.AppendCertsFromPEM(certData) {
+		return nil, errors.Wrapf(err, "Failed to append cert which was read from %s ", CertPath)
+	}
+	return certPool, nil
+}
+
 type ObjectLocked struct {
 	Details        []interface{} `json:"details"`
 	ErrorAlias     []interface{} `json:"error_alias"`
@@ -51,14 +65,36 @@ type logger interface {
 	Debugf(string, ...interface{})
 }
 
-func NewManager(token string) *Manager {
+func NewManager(token string, CertPath string) (*Manager, error) {
+	var transport *http.Transport
+
+	if CertPath != "" {
+		certPool, err := loadCertificatesFromFile(CertPath)
+		if err != nil {
+			return nil, err
+		}
+
+		transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: certPool,
+			},
+		}
+
+	} else {
+		transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+
 	return &Manager{
-		Client:    http.DefaultClient,
+		Client:    &http.Client{Transport: transport},
 		BaseURL:   DefaultBaseURL,
 		Token:     token,
 		UserAgent: "bcc-go",
 		ctx:       context.Background(),
-	}
+	}, nil
 }
 
 func (m *Manager) WithContext(ctx context.Context) *Manager {
