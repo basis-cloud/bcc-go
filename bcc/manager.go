@@ -45,7 +45,15 @@ func loadCertificatesFromFile(CertPath string) (*x509.CertPool, error) {
 		return nil, errors.Wrapf(err, "Error with open cert by path %s ", CertPath)
 	}
 	if !certPool.AppendCertsFromPEM(certData) {
-		return nil, errors.Wrapf(err, "Failed to append cert which was read from %s ", CertPath)
+		return nil, fmt.Errorf("Failed to append cert which was read from file ")
+	}
+	return certPool, nil
+}
+
+func loadCertificatesFromString(certString string) (*x509.CertPool, error) {
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM([]byte(certString)) {
+		return nil, fmt.Errorf("Failed to append cert which was read from string ")
 	}
 	return certPool, nil
 }
@@ -65,11 +73,19 @@ type logger interface {
 	Debugf(string, ...interface{})
 }
 
-func NewManager(token string, CertPath string) (*Manager, error) {
+func NewManager(token string, cert string, insecure bool) (*Manager, error) {
 	var transport *http.Transport
 
-	if CertPath != "" {
-		certPool, err := loadCertificatesFromFile(CertPath)
+	if cert != "" {
+		var certPool *x509.CertPool
+		_, err := os.Stat(cert)
+
+		if err == nil {
+			certPool, err = loadCertificatesFromFile(cert)
+		} else {
+			certPool, err = loadCertificatesFromString(cert)
+		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -79,11 +95,10 @@ func NewManager(token string, CertPath string) (*Manager, error) {
 				RootCAs: certPool,
 			},
 		}
-
 	} else {
 		transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: insecure,
 			},
 		}
 	}
