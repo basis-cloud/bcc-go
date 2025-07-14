@@ -38,26 +38,6 @@ type Manager struct {
 	ctx       context.Context
 }
 
-func loadCertificatesFromFile(CertPath string) (*x509.CertPool, error) {
-	certPool := x509.NewCertPool()
-	certData, err := os.ReadFile(CertPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Error with open cert by path %s ", CertPath)
-	}
-	if !certPool.AppendCertsFromPEM(certData) {
-		return nil, fmt.Errorf("Failed to append cert which was read from file ")
-	}
-	return certPool, nil
-}
-
-func loadCertificatesFromString(certString string) (*x509.CertPool, error) {
-	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM([]byte(certString)) {
-		return nil, fmt.Errorf("Failed to append cert which was read from string ")
-	}
-	return certPool, nil
-}
-
 type ObjectLocked struct {
 	Details        []interface{} `json:"details"`
 	ErrorAlias     []interface{} `json:"error_alias"`
@@ -73,34 +53,63 @@ type logger interface {
 	Debugf(string, ...interface{})
 }
 
-func NewManager(token string, cert string, insecure bool) (*Manager, error) {
+func getCaCert(cert string) (*x509.CertPool, error) {
+	var certPool *x509.CertPool
+	certData, err := loadFile(cert)
+
+	if !certPool.AppendCertsFromPEM(certData) {
+		return nil, errors.Wrapf(err, "Error with append CA cert to pool %s ", cert)
+	}
+
+	return certPool, nil
+}
+
+func getClientCert(caCert string, cert string, key string) ([]tls.Certificate, error) {
+	if cert != "" && key != "" {
+		if caCert == "" {
+			return nil, fmt.Errorf("CaCert is empty, " +
+				"if you using client sert for connection, root cert must be required")
+		}
+
+		certData, fileErr := loadFile(cert)
+		keyData, keyErr := loadFile(key)
+
+		cert, err := tls.X509KeyPair(certData, keyData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate."+
+				" \n file_err: %w \n key_err: %w \n global_err: %w", fileErr, keyErr, err)
+		}
+
+		return []tls.Certificate{cert}, nil
+
+	} else if key != "" {
+		return nil, fmt.Errorf("client cert cannot be apply without key file")
+
+	} else {
+		return nil, nil
+	}
+}
+
+func NewManager(token string, caCert string, cert string, certKey string, insecure bool) (*Manager, error) {
 	var transport *http.Transport
 
-	if cert != "" {
-		var certPool *x509.CertPool
-		_, err := os.Stat(cert)
+	certPool, err := getCaCert(caCert)
+	if err != nil {
+		return nil, err
+	}
 
-		if err == nil {
-			certPool, err = loadCertificatesFromFile(cert)
-		} else {
-			certPool, err = loadCertificatesFromString(cert)
-		}
+	clientCerts, err := getClientCert(caCert, cert, certKey)
+	if err != nil {
+		return nil, err
+	}
 
-		if err != nil {
-			return nil, err
-		}
-
-		transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: certPool,
-			},
-		}
-	} else {
-		transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecure,
-			},
-		}
+	transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs:            certPool,
+			Certificates:       clientCerts,
+			InsecureSkipVerify: insecure,
+			MinVersion:         tls.VersionTLS12,
+		},
 	}
 
 	return &Manager{

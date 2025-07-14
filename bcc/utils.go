@@ -2,7 +2,9 @@ package bcc
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -26,6 +28,24 @@ func (args Arguments) merge(extraArgs []Arguments) {
 			args[key] = val
 		}
 	}
+}
+
+func loadFile(file string) ([]byte, error) {
+	_, err := os.Stat(file)
+
+	if err != nil {
+		data, err := os.ReadFile(file)
+
+		if err != nil {
+			return data, nil
+		} else {
+			return nil, fmt.Errorf("Failed with open file by path")
+		}
+
+	} else {
+		return []byte(file), fmt.Errorf("File cannot be found by path, then the func returns a byte list of the received file param")
+	}
+
 }
 
 // From https://github.com/aws/aws-sdk-go/blob/main/aws/context_sleep.go
