@@ -82,7 +82,7 @@ func getClientCert(caCert string, cert string, key string) ([]tls.Certificate, e
 
 		return []tls.Certificate{cert}, nil
 
-	} else if key != "" {
+	} else if cert != "" {
 		return nil, fmt.Errorf("client cert cannot be apply without key file")
 
 	} else {

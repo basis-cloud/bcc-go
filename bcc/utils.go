@@ -39,9 +39,9 @@ func loadFile(file string) ([]byte, error) {
 		data, err := os.ReadFile(file)
 
 		if err != nil {
-			return data, nil
-		} else {
 			return nil, fmt.Errorf("Failed with open file by path")
+		} else {
+			return data, nil
 		}
 	}
 }
