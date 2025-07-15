@@ -34,6 +34,8 @@ func loadFile(file string) ([]byte, error) {
 	_, err := os.Stat(file)
 
 	if err != nil {
+		return []byte(file), fmt.Errorf("File cannot be found by path, then the func returns a byte list of the received file param")
+	} else {
 		data, err := os.ReadFile(file)
 
 		if err != nil {
@@ -41,11 +43,7 @@ func loadFile(file string) ([]byte, error) {
 		} else {
 			return nil, fmt.Errorf("Failed with open file by path")
 		}
-
-	} else {
-		return []byte(file), fmt.Errorf("File cannot be found by path, then the func returns a byte list of the received file param")
 	}
-
 }
 
 // From https://github.com/aws/aws-sdk-go/blob/main/aws/context_sleep.go
