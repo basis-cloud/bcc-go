@@ -54,7 +54,7 @@ type logger interface {
 }
 
 func getCaCert(cert string) (*x509.CertPool, error) {
-	var certPool *x509.CertPool
+	certPool := x509.NewCertPool()
 	certData, err := loadFile(cert)
 
 	if !certPool.AppendCertsFromPEM(certData) {
@@ -67,8 +67,8 @@ func getCaCert(cert string) (*x509.CertPool, error) {
 func getClientCert(caCert string, cert string, key string) ([]tls.Certificate, error) {
 	if cert != "" && key != "" {
 		if caCert == "" {
-			return nil, fmt.Errorf("CaCert is empty," +
-				" if you using client sert for connection, root cert must be required")
+			return nil, fmt.Errorf("CaCert is empty, " +
+				"if you using client sert for connection, root cert must be required")
 		}
 
 		certData, fileErr := loadFile(cert)
