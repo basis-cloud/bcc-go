@@ -54,14 +54,19 @@ type logger interface {
 }
 
 func getCaCert(cert string) (*x509.CertPool, error) {
-	certPool := x509.NewCertPool()
-	certData, err := loadFile(cert)
+	if cert != "" {
+		certPool := x509.NewCertPool()
+		certData, err := loadFile(cert)
 
-	if !certPool.AppendCertsFromPEM(certData) {
-		return nil, errors.Wrapf(err, "Error with append CA cert to pool %s ", cert)
+		if !certPool.AppendCertsFromPEM(certData) {
+			return nil, errors.Wrapf(err, "Error with append CA cert to pool %s ", cert)
+		}
+
+		return certPool, nil
+	} else {
+
+		return nil, nil
 	}
-
-	return certPool, nil
 }
 
 func getClientCert(caCert string, cert string, key string) ([]tls.Certificate, error) {
