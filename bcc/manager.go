@@ -241,11 +241,11 @@ func (m *Manager) GetItems(path string, args Arguments, target interface{}) erro
 		}
 		targetValue.Set(reflect.AppendSlice(targetValue, currentItemsValue.Elem()))
 		if targetValue.Len() == temp.Total {
-			m.log("[bcc] Retrieved items: %+v", targetValue.Interface())
 			break
 		}
 		page++
 	}
+	m.log("[bcc] Retrieved items: %+v", target)
 	return nil
 }
 
