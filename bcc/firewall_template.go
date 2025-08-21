@@ -31,7 +31,8 @@ func (v *Vdc) GetFirewallTemplates(extraArgs ...Arguments) (firewallTemplate []*
 
 	path := "v1/firewall"
 	err = v.manager.GetItems(path, args, &firewallTemplate)
-	for i := range firewallTemplate {
+	for i, ft := range firewallTemplate {
+		v.manager.log("FirewallTemplate[%d]: %+v", i, ft)
 		firewallTemplate[i].manager = v.manager
 	}
 	return
