@@ -120,6 +120,15 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 				},
 			},
 		}
+	} else if insecure == true {
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: insecure,
+					MinVersion:         tls.VersionTLS12,
+				},
+			},
+		}
 	} else {
 		client = &http.Client{
 			Transport: &http.Transport{},
