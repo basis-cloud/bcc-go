@@ -2,7 +2,9 @@ package bcc
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -24,6 +26,22 @@ func (args Arguments) merge(extraArgs []Arguments) {
 	for _, extraArg := range extraArgs {
 		for key, val := range extraArg {
 			args[key] = val
+		}
+	}
+}
+
+func loadFile(file string) ([]byte, error) {
+	_, err := os.Stat(file)
+
+	if err != nil {
+		return []byte(file), fmt.Errorf("File cannot be found by path, then the func returns a byte list of the received file param")
+	} else {
+		data, err := os.ReadFile(file)
+
+		if err != nil {
+			return nil, fmt.Errorf("Failed with open file by path")
+		} else {
+			return data, nil
 		}
 	}
 }

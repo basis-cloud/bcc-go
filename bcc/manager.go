@@ -73,38 +73,93 @@ type logger interface {
 	Debugf(string, ...interface{})
 }
 
-func NewManager(token string, cert string, insecure bool) (*Manager, error) {
-	var transport *http.Transport
-
+func getCaCert(cert string) (*x509.CertPool, error) {
 	if cert != "" {
-		var certPool *x509.CertPool
-		_, err := os.Stat(cert)
+		certPool := x509.NewCertPool()
+		certData, err := loadFile(cert)
 
-		if err == nil {
-			certPool, err = loadCertificatesFromFile(cert)
-		} else {
-			certPool, err = loadCertificatesFromString(cert)
+		if !certPool.AppendCertsFromPEM(certData) {
+			return nil, errors.Wrapf(err, "Error with append CA cert to pool %s ", cert)
 		}
 
+		return certPool, nil
+	} else {
+
+		return nil, nil
+	}
+}
+
+func getClientCert(caCert string, cert string, key string) ([]tls.Certificate, error) {
+	if cert != "" && key != "" {
+		if caCert != "" {
+			certData, fileErr := loadFile(cert)
+			keyData, keyErr := loadFile(key)
+
+			cert, err := tls.X509KeyPair(certData, keyData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load client certificate."+
+					" \n file_err: %w \n key_err: %w \n global_err: %w", fileErr, keyErr, err)
+			}
+
+			return []tls.Certificate{cert}, nil
+		} else {
+			return nil, fmt.Errorf("CaCert is empty, " +
+				"if you using client sert for connection, root cert must be required")
+		}
+	} else if cert != "" {
+		return nil, fmt.Errorf("client cert cannot be apply without key file")
+	} else if key != "" {
+		return nil, fmt.Errorf("client key cannot be apply without client cert file")
+	} else {
+		return nil, nil
+	}
+}
+
+func NewManager(token string, caCert string, cert string, certKey string, insecure bool) (*Manager, error) {
+	var client *http.Client
+
+	certPool, err := getCaCert(caCert)
+	if err != nil {
+		return nil, err
+	}
+
+	if certPool != nil {
+		clientCerts, err := getClientCert(caCert, cert, certKey)
 		if err != nil {
 			return nil, err
 		}
-
-		transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: certPool,
+    
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs:            certPool,
+					Certificates:       clientCerts,
+					InsecureSkipVerify: insecure,
+					MinVersion:         tls.VersionTLS12,
+				},
 			},
 		}
-	} else {
-		transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecure,
+    
+	} else if insecure == true {
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: insecure,
+					MinVersion:         tls.VersionTLS12,
+				},
 			},
+		}
+    
+	} else {
+		client = &http.Client{
+			Transport: &http.Transport{},
 		}
 	}
 
 	return &Manager{
-		Client:    &http.Client{Transport: transport},
+
+		Client:    client,
+
 		BaseURL:   DefaultBaseURL,
 		Token:     token,
 		UserAgent: "bcc-go",
@@ -222,6 +277,7 @@ func (m *Manager) GetItems(path string, args Arguments, target interface{}) erro
 		}
 		page++
 	}
+	m.log("[bcc] Retrieved items: %+v", target)
 	return nil
 }
 
