@@ -38,6 +38,26 @@ type Manager struct {
 	ctx       context.Context
 }
 
+func loadCertificatesFromFile(CertPath string) (*x509.CertPool, error) {
+	certPool := x509.NewCertPool()
+	certData, err := os.ReadFile(CertPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error with open cert by path %s ", CertPath)
+	}
+	if !certPool.AppendCertsFromPEM(certData) {
+		return nil, fmt.Errorf("Failed to append cert which was read from file ")
+	}
+	return certPool, nil
+}
+
+func loadCertificatesFromString(certString string) (*x509.CertPool, error) {
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM([]byte(certString)) {
+		return nil, fmt.Errorf("Failed to append cert which was read from string ")
+	}
+	return certPool, nil
+}
+
 type ObjectLocked struct {
 	Details        []interface{} `json:"details"`
 	ErrorAlias     []interface{} `json:"error_alias"`
@@ -104,12 +124,11 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 	}
 
 	if certPool != nil {
-
 		clientCerts, err := getClientCert(caCert, cert, certKey)
 		if err != nil {
 			return nil, err
 		}
-
+    
 		client = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -120,6 +139,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 				},
 			},
 		}
+    
 	} else if insecure == true {
 		client = &http.Client{
 			Transport: &http.Transport{
@@ -129,6 +149,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 				},
 			},
 		}
+    
 	} else {
 		client = &http.Client{
 			Transport: &http.Transport{},
@@ -136,7 +157,9 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 	}
 
 	return &Manager{
+
 		Client:    client,
+
 		BaseURL:   DefaultBaseURL,
 		Token:     token,
 		UserAgent: "bcc-go",
