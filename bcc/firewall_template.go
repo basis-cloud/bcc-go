@@ -11,6 +11,7 @@ type FirewallTemplate struct {
 	Name    string `json:"name"`
 	Locked  bool   `json:"locked"`
 	Tags    []Tag  `json:"tags"`
+	Vdc     *Vdc   `json:"vdc,omitempty"`
 }
 
 func (m *Manager) GetFirewallTemplate(id string) (firewallTemplate *FirewallTemplate, err error) {
