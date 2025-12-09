@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+type MetaData struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func convertNameToId(listMetaData []*MetaData) []string {
+	metaData := make([]string, len(listMetaData))
+	for i, meta := range listMetaData {
+		metaData[i] = meta.ID
+	}
+	return metaData
+}
+
 type Arguments map[string]string
 
 func Defaults() Arguments {
@@ -71,15 +84,16 @@ func loopWaitLock(manager *Manager, path string) (err error) {
 	var wait struct {
 		Locked bool `json:"locked"`
 	}
+
 	for {
-		err = manager.Get(path, Defaults(), &wait)
-		if err != nil {
-			return
+		if err = manager.Get(path, Defaults(), &wait); err != nil {
+			return err
 		}
 		if !wait.Locked {
 			break
 		}
 		time.Sleep(time.Second)
 	}
-	return
+
+	return nil
 }
