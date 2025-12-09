@@ -3,30 +3,31 @@ package bcc
 import (
 	"fmt"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type Vm struct {
-	manager     *Manager
-	ID          string        `json:"id"`
-	Name        string        `json:"name"`
-	Description string        `json:"description"`
-	Cpu         int           `json:"cpu"`
-	Ram         float64       `json:"ram"`
-	Power       bool          `json:"power"`
-	Vdc         *Vdc          `json:"vdc"`
-	HotAdd      bool          `json:"hotadd_feature"`
-	Template    *Template     `json:"template"`
-	Metadata    []*VmMetadata `json:"metadata"`
-	UserData    *string       `json:"user_data"`
-	Ports       []*Port       `json:"ports"`
-	Disks       []*Disk       `json:"disks"`
-	Floating    *Port         `json:"floating"`
-	Locked      bool          `json:"locked,omitempty"`
-	Tags        []Tag         `json:"tags"`
-	Kubernetes  *struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	} `json:"kubernetes,omitempty"`
+	manager        *Manager
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Description    string           `json:"description"`
+	Cpu            int              `json:"cpu"`
+	Ram            float64          `json:"ram"`
+	Power          bool             `json:"power"`
+	Vdc            *Vdc             `json:"vdc"`
+	HotAdd         bool             `json:"hotadd_feature"`
+	Template       *Template        `json:"template"`
+	Metadata       []*VmMetadata    `json:"metadata"`
+	UserData       *string          `json:"user_data"`
+	Ports          []*Port          `json:"ports"`
+	Disks          []*Disk          `json:"disks"`
+	Floating       *Port            `json:"floating"`
+	Locked         bool             `json:"locked,omitempty"`
+	Platform       *Platform        `json:"platform,omitempty"`
+	Tags           []Tag            `json:"tags"`
+	Kubernetes     *MetaData        `json:"kubernetes,omitempty"`
+	AffinityGroups []*AffinityGroup `json:"affinity_groups,omitempty"`
 }
 
 func NewVm(name string, cpu int, ram float64, template *Template, metadata []*VmMetadata, userData *string, ports []*Port, disks []*Disk, floating *string) Vm {
@@ -85,26 +86,103 @@ func (m *Manager) GetVm(id string) (vm *Vm, err error) {
 	if vm.Floating != nil {
 		vm.Floating.manager = m
 	}
+
 	return
 }
 
-func (v *Vm) Reload() error {
-	m := v.manager
-	path, _ := url.JoinPath("v1/vm", v.ID)
-	if err := m.Get(path, Defaults(), &v); err != nil {
-		return err
+func (v *Vdc) CreateVm(vm *Vm) error {
+	type TempPortCreate struct {
+		ID string `json:"id"`
 	}
 
-	v.manager = m
-	for x := range v.Ports {
-		v.Ports[x].manager = m
+	tempPorts := make([]*TempPortCreate, len(vm.Ports))
+	for idx := range vm.Ports {
+		tempPorts[idx] = &TempPortCreate{ID: vm.Ports[idx].ID}
 	}
-	for x := range v.Disks {
-		v.Disks[x].manager = m
+
+	type TempFields struct {
+		Field string `json:"field"`
+		Value string `json:"value"`
 	}
-	v.Vdc.manager = m
-	if v.Floating != nil {
-		v.Floating.manager = m
+
+	tempFields := make([]*TempFields, len(vm.Metadata))
+	for idx := range vm.Metadata {
+		tempFields[idx] = &TempFields{Field: vm.Metadata[idx].Field.ID, Value: vm.Metadata[idx].Value}
+	}
+
+	type TempDisk struct {
+		Name           string `json:"name"`
+		Size           int    `json:"size"`
+		StorageProfile string `json:"storage_profile"`
+	}
+
+	tempDisks := make([]*TempDisk, len(vm.Disks))
+	for idx := range vm.Disks {
+		tempDisks[idx] = &TempDisk{Name: vm.Disks[idx].Name, Size: vm.Disks[idx].Size, StorageProfile: vm.Disks[idx].StorageProfile.ID}
+	}
+
+	var _affGr []string
+	if vm.AffinityGroups != nil && len(vm.AffinityGroups) > 0 {
+		for _, group := range vm.AffinityGroups {
+			_affGr = append(_affGr, group.ID)
+		}
+	}
+
+	args := &struct {
+		Name           string            `json:"name"`
+		Cpu            int               `json:"cpu"`
+		Ram            float64           `json:"ram"`
+		Vdc            string            `json:"vdc"`
+		Template       string            `json:"template"`
+		Ports          []*TempPortCreate `json:"ports"`
+		Metadata       []*TempFields     `json:"metadata"`
+		UserData       *string           `json:"user_data,omitempty"`
+		Disks          []*TempDisk       `json:"disks"`
+		Floating       *string           `json:"floating"`
+		Tags           []string          `json:"tags"`
+		Platform       *string           `json:"platform,omitempty"`
+		AffinityGroups []string          `json:"affinity_groups,omitempty"`
+	}{
+		Name:           vm.Name,
+		Cpu:            vm.Cpu,
+		Ram:            vm.Ram,
+		Vdc:            v.ID,
+		Template:       vm.Template.ID,
+		Ports:          tempPorts,
+		Metadata:       tempFields,
+		UserData:       vm.UserData,
+		Disks:          tempDisks,
+		Floating:       nil,
+		Tags:           convertTagsToNames(vm.Tags),
+		Platform:       nil,
+		AffinityGroups: _affGr,
+	}
+
+	if vm.Floating != nil {
+		if vm.Floating.ID != "" {
+			args.Floating = &vm.Floating.ID
+		} else {
+			args.Floating = vm.Floating.IpAddress
+		}
+	}
+
+	if vm.Platform != nil {
+		args.Platform = &vm.Platform.ID
+	}
+
+	if err := v.manager.Request("POST", "v1/vm", args, &vm); err != nil {
+		return errors.Wrapf(err, "crash via creating vm")
+	} else {
+		vm.manager = v.manager
+		for idx := range vm.Ports {
+			vm.Ports[idx].manager = v.manager
+		}
+		for idx := range vm.Disks {
+			vm.Disks[idx].manager = v.manager
+		}
+		if vm.Floating != nil {
+			vm.Floating.manager = v.manager
+		}
 	}
 
 	return nil
@@ -161,24 +239,71 @@ func (v *Vm) DisconnectPort(port *Port) error {
 	return nil
 }
 
+func (v *Vm) PowerOn() error {
+	return v.updateState("power_on")
+}
+
+func (v *Vm) PowerOff() error {
+	if err := v.updateState("power_off"); err != nil {
+		return errors.Wrapf(err, "failed to power off vm")
+	}
+	return nil
+}
+
+func (v *Vm) Reboot() error {
+	return v.updateState("reboot")
+}
+
+func (v *Vm) Reload() error {
+	m := v.manager
+	path, _ := url.JoinPath("v1/vm", v.ID)
+	if err := m.Get(path, Defaults(), &v); err != nil {
+		return errors.Wrapf(err, "failed to reload vm")
+	}
+
+	v.manager = m
+	for x := range v.Ports {
+		v.Ports[x].manager = m
+	}
+	for x := range v.Disks {
+		v.Disks[x].manager = m
+	}
+	v.Vdc.manager = m
+	if v.Floating != nil {
+		v.Floating.manager = m
+	}
+
+	return nil
+}
+
 func (v *Vm) Update() error {
 	path, _ := url.JoinPath("v1/vm", v.ID)
+	var _affGr []string
+
+	if v.AffinityGroups != nil && len(v.AffinityGroups) > 0 {
+		for _, group := range v.AffinityGroups {
+			_affGr = append(_affGr, group.ID)
+		}
+	}
+
 	args := &struct {
-		Name        string   `json:"name"`
-		Description string   `json:"description"`
-		Cpu         int      `json:"cpu"`
-		Ram         float64  `json:"ram"`
-		HotAdd      bool     `json:"hotadd_feature"`
-		Floating    *string  `json:"floating"`
-		Tags        []string `json:"tags"`
+		AffinityGroups []string `json:"affinity_groups,omitempty"`
+		Name           string   `json:"name"`
+		Description    string   `json:"description"`
+		Cpu            int      `json:"cpu"`
+		Ram            float64  `json:"ram"`
+		HotAdd         bool     `json:"hotadd_feature"`
+		Floating       *string  `json:"floating"`
+		Tags           []string `json:"tags"`
 	}{
-		Name:        v.Name,
-		Description: v.Description,
-		Cpu:         v.Cpu,
-		Ram:         v.Ram,
-		HotAdd:      v.HotAdd,
-		Floating:    nil,
-		Tags:        convertTagsToNames(v.Tags),
+		AffinityGroups: nil,
+		Name:           v.Name,
+		Description:    v.Description,
+		Cpu:            v.Cpu,
+		Ram:            v.Ram,
+		HotAdd:         v.HotAdd,
+		Floating:       nil,
+		Tags:           convertTagsToNames(v.Tags),
 	}
 
 	if v.Floating != nil {
@@ -188,6 +313,7 @@ func (v *Vm) Update() error {
 			args.Floating = v.Floating.IpAddress
 		}
 	}
+
 	err := v.manager.Request("PUT", path, args, v)
 	if err != nil {
 		return err
@@ -207,24 +333,16 @@ func (v *Vm) updateState(state string) error {
 	return v.manager.Request("POST", path, args, v)
 }
 
-func (v *Vm) PowerOn() error {
-	return v.updateState("power_on")
-}
-
-func (v *Vm) Reboot() error {
-	return v.updateState("reboot")
-}
-
-func (v *Vm) PowerOff() error {
-	return v.updateState("power_off")
-}
-
 func (v *Vm) Delete() error {
 	path, _ := url.JoinPath("v1/vm", v.ID)
 	return v.manager.Delete(path, Defaults(), nil)
 }
 
-func (v Vm) WaitLock() (err error) {
+func (v Vm) WaitLock() error {
 	path, _ := url.JoinPath("v1/vm", v.ID)
-	return loopWaitLock(v.manager, path)
+	if err := loopWaitLock(v.manager, path); err != nil {
+		return errors.Wrapf(err, "crash via WaitLock for VM")
+	} else {
+		return nil
+	}
 }
