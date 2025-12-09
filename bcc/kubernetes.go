@@ -15,27 +15,24 @@ type Kubernetes struct {
 	manager *Manager
 	ID      string `json:"id"`
 	Name    string `json:"name"`
-	Locked  bool   `json:"locked"`
 	Vdc     *Vdc   `json:"vdc"`
+	Vms     []*Vm  `json:"vms"`
 
-	Vms     []*Vm `json:"vms"`
-	Project struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	} `json:"project"`
+	Project       *Project            `json:"project"`
+	Floating      *Port               `json:"floating"`
+	UserPublicKey string              `json:"user_public_key"`
+	Template      *KubernetesTemplate `json:"template"`
 
-	Floating     *Port     `json:"floating"`
-	JobId        string    `json:"job_id"`
-	NodeCpu      int       `json:"node_cpu"`
-	NodeDiskSize int       `json:"node_disk_size"`
-	NodePlatform *Platform `json:"node_platform"`
+	NodeCpu            int             `json:"node_cpu"`
+	NodeRam            int             `json:"node_ram"`
+	NodesCount         int             `json:"nodes_count"`
+	NodePlatform       *Platform       `json:"node_platform"`
+	NodeDiskSize       int             `json:"node_disk_size"`
+	NodeStorageProfile *StorageProfile `json:"node_storage_profile"`
 
-	NodeRam            int                 `json:"node_ram"`
-	NodeStorageProfile *StorageProfile     `json:"node_storage_profile"`
-	NodesCount         int                 `json:"nodes_count"`
-	Template           *KubernetesTemplate `json:"template"`
-	UserPublicKey      string              `json:"user_public_key"`
-	Tags               []Tag               `json:"tags"`
+	Locked bool   `json:"locked"`
+	JobId  string `json:"job_id"`
+	Tags   []Tag  `json:"tags"`
 }
 
 type KubernetesDashBoardUrl struct {
@@ -48,17 +45,6 @@ func NewKubernetes(name string, nodeCpu int, nodeRam int, nodesCount int, nodeDi
 		k.Floating = &Port{IpAddress: floating}
 	}
 	return k
-}
-
-func (m *Manager) GetKubernetes(id string) (k8s *Kubernetes, err error) {
-	path, _ := url.JoinPath("/v1/kubernetes", id)
-	err = m.Get(path, Defaults(), &k8s)
-	if err != nil {
-		return
-	}
-	k8s.Vdc.manager = m
-	k8s.manager = m
-	return
 }
 
 func (m *Manager) ListKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err error) {
@@ -76,12 +62,10 @@ func (m *Manager) ListKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err 
 	return
 }
 
-func (v *Vdc) GetKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err error) {
-	args := Arguments{
-		"vdc": v.ID,
-	}
-	args.merge(extraArgs)
-	ks, err = v.manager.ListKubernetes(args)
+func (k *Kubernetes) GetKubernetesConfigUrl() (err error) {
+	var config *string
+	path := fmt.Sprintf("/v1/kubernetes/%s/config", k.ID)
+	err = k.manager.Get(path, Defaults(), &config)
 	return
 }
 
@@ -91,11 +75,77 @@ func (k *Kubernetes) GetKubernetesDashBoardUrl() (dashboard_url *KubernetesDashB
 	return
 }
 
-func (k *Kubernetes) GetKubernetesConfigUrl() (err error) {
-	var config *string
-	path := fmt.Sprintf("/v1/kubernetes/%s/config", k.ID)
-	err = k.manager.Get(path, Defaults(), &config)
+func (m *Manager) GetKubernetes(id string) (k8s *Kubernetes, err error) {
+	path, _ := url.JoinPath("/v1/kubernetes", id)
+	err = m.Get(path, Defaults(), &k8s)
+	if err != nil {
+		return
+	}
+	k8s.Vdc.manager = m
+	k8s.manager = m
 	return
+}
+
+func (v *Vdc) GetKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err error) {
+	args := Arguments{
+		"vdc": v.ID,
+	}
+	args.merge(extraArgs)
+	ks, err = v.manager.ListKubernetes(args)
+	return
+}
+
+func (v *Vdc) CreateKubernetes(k *Kubernetes) error {
+	type TempPortCreate struct {
+		ID string `json:"id"`
+	}
+
+	args := &struct {
+		Name               string   `json:"name"`
+		NodeCpu            int      `json:"node_cpu"`
+		NodeRam            int      `json:"node_ram"`
+		NodeDiskSize       int      `json:"node_disk_size"`
+		NodesCount         int      `json:"nodes_count"`
+		NodeStorageProfile *string  `json:"node_storage_profile"`
+		Vdc                *string  `json:"vdc"`
+		Template           *string  `json:"template"`
+		Floating           *string  `json:"floating"`
+		UserPublicKey      string   `json:"user_public_key"`
+		NodePlatform       *string  `json:"node_platform,omitempty"`
+		Tags               []string `json:"tags"`
+	}{
+		Name:               k.Name,
+		NodeCpu:            k.NodeCpu,
+		NodeRam:            k.NodeRam,
+		NodeDiskSize:       k.NodeDiskSize,
+		NodesCount:         k.NodesCount,
+		NodeStorageProfile: &k.NodeStorageProfile.ID,
+		Vdc:                &v.ID,
+		Template:           &k.Template.ID,
+		UserPublicKey:      k.UserPublicKey,
+		Floating:           nil,
+		NodePlatform:       nil,
+		Tags:               convertTagsToNames(k.Tags),
+	}
+
+	if k.Floating != nil {
+		args.Floating = k.Floating.IpAddress
+	}
+
+	if k.NodePlatform != nil {
+		args.NodePlatform = &k.NodePlatform.ID
+	}
+
+	if err := v.manager.Request("POST", "/v1/kubernetes", args, &k); err != nil {
+		return err
+	} else {
+		k.manager = v.manager
+		for idx := range k.Vms {
+			k.Vms[idx].manager = v.manager
+		}
+	}
+
+	return nil
 }
 
 func (k *Kubernetes) Update() error {
@@ -141,7 +191,7 @@ func (k *Kubernetes) Delete() error {
 	return k.manager.Delete(path, Defaults(), nil)
 }
 
-func (k Kubernetes) WaitLock() (err error) {
+func (k Kubernetes) WaitLock() error {
 	path, _ := url.JoinPath("v1/kubernetes", k.ID)
 	return loopWaitLock(k.manager, path)
 }
