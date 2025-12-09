@@ -2,22 +2,23 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type Router struct {
 	manager   *Manager
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	IsDefault bool   `json:"is_default"`
-	Vdc       struct {
-		Id string `json:"id"`
-	} `json:"vdc"`
-	Ports    []*Port  `json:"ports"`
-	Routes   []*Route `json:"routes"`
-	Floating *Port    `json:"floating"`
-	Locked   bool     `json:"locked"`
-	Tags     []Tag    `json:"tags"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	IsDefault bool     `json:"is_default"`
+	Vdc       *Vdc     `json:"vdc"`
+	Ports     []*Port  `json:"ports"`
+	Routes    []*Route `json:"routes"`
+	Floating  *Port    `json:"floating"`
+	Locked    bool     `json:"locked"`
+	Tags      []Tag    `json:"tags"`
 }
 
 func NewRouter(name string, floating *string) Router {
@@ -71,9 +72,47 @@ func (m *Manager) GetRouter(id string) (router *Router, err error) {
 	return
 }
 
-func (r Router) WaitLock() (err error) {
-	path, _ := url.JoinPath("v1/router", r.ID)
-	return loopWaitLock(r.manager, path)
+func (v *Vdc) CreateRouter(router *Router) error {
+	type TempPortCreate struct {
+		ID string `json:"id"`
+	}
+
+	tempPorts := make([]*TempPortCreate, len(router.Ports))
+	for idx, port := range router.Routes {
+		tempPorts[idx] = &TempPortCreate{ID: port.ID}
+	}
+
+	args := &struct {
+		Name     string            `json:"name"`
+		Vdc      string            `json:"vdc"`
+		Ports    []*TempPortCreate `json:"ports"`
+		Routes   []*Route          `json:"routes"`
+		Floating *string           `json:"floating"`
+		Tags     []string          `json:"tags"`
+	}{
+		Name:     router.Name,
+		Vdc:      v.ID,
+		Ports:    tempPorts,
+		Routes:   router.Routes,
+		Floating: nil,
+		Tags:     convertTagsToNames(router.Tags),
+	}
+
+	if router.Floating != nil {
+		if router.Floating.ID != "" {
+			args.Floating = &router.Floating.ID
+		} else {
+			args.Floating = router.Floating.IpAddress
+		}
+	}
+
+	if err := v.manager.Request("POST", "v1/router", args, &router); err != nil {
+		return err
+	} else {
+		router.manager = v.manager
+	}
+
+	return nil
 }
 
 func (r *Router) ConnectPort(port *Port, exsist bool) error {
@@ -139,16 +178,14 @@ func (r *Router) Rename(name string) error {
 
 func (r *Router) Update() error {
 	args := &struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		IsDefault bool   `json:"is_default"`
-		Vdc       struct {
-			Id string `json:"id"`
-		} `json:"vdc"`
-		Ports    []*Port  `json:"ports"`
-		Routes   []*Route `json:"routes"`
-		Floating *string  `json:"floating"`
-		Tags     []string `json:"tags"`
+		ID        string   `json:"id"`
+		Name      string   `json:"name"`
+		IsDefault bool     `json:"is_default"`
+		Vdc       *Vdc     `json:"vdc"`
+		Ports     []*Port  `json:"ports"`
+		Routes    []*Route `json:"routes"`
+		Floating  *string  `json:"floating"`
+		Tags      []string `json:"tags"`
 	}{
 		ID:        r.ID,
 		Name:      r.Name,
@@ -164,6 +201,19 @@ func (r *Router) Update() error {
 		args.Floating = &r.Floating.ID
 	}
 	path, _ := url.JoinPath("v1/router", r.ID)
-	r.WaitLock()
+	if err := r.WaitLock(); err != nil {
+		return err
+	}
+
 	return r.manager.Request("PUT", path, args, r)
+}
+
+func (r Router) WaitLock() error {
+	path, _ := url.JoinPath("v1/router", r.ID)
+	if err := loopWaitLock(r.manager, path); err != nil {
+		log.Printf("[REQUEST-ERROR]: %s]", errors.WithStack(err))
+		return fmt.Errorf("request for WaitLock to Router was failed")
+	} else {
+		return nil
+	}
 }
