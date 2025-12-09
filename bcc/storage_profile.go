@@ -2,6 +2,8 @@ package bcc
 
 import (
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type StorageProfile struct {
@@ -31,10 +33,10 @@ func (v *Vdc) GetStorageProfile(id string) (storageProfile *StorageProfile, err 
 	}
 
 	path, _ := url.JoinPath("v1/storage_profile", id)
-	err = v.manager.Get(path, args, &storageProfile)
-	if err != nil {
+	if err = v.manager.Get(path, args, &storageProfile); err != nil {
+		return nil, errors.Wrapf(err, "crash via getting StorageProfile-%s", id)
+	} else {
+		storageProfile.manager = v.manager
 		return
 	}
-	storageProfile.manager = v.manager
-	return
 }

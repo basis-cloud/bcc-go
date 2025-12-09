@@ -1,7 +1,10 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type Project struct {
@@ -36,7 +39,8 @@ func (m *Manager) GetProject(id string) (project *Project, err error) {
 	path, _ := url.JoinPath("v1/project", id)
 	err = m.Get(path, Defaults(), &project)
 	if err != nil {
-		return
+		log.Printf("[REQUEST-ERROR]: getting project-%s was failed: %s]", id, errors.WithStack(err))
+		return nil, err
 	}
 	project.manager = m
 	return
