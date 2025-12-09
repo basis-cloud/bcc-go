@@ -2,7 +2,10 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 type Port struct {
@@ -42,6 +45,76 @@ func (v *Vdc) GetPorts(extraArgs ...Arguments) (ports []*Port, err error) {
 		ports[i].Network.manager = v.manager
 	}
 	return
+}
+
+func (m *Manager) GetPort(id string) (port *Port, err error) {
+	path, _ := url.JoinPath("v1/port", id)
+	if err = m.Get(path, Defaults(), &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: getting port-%s was failed: %s]", id, errors.WithStack(err))
+		return nil, err
+	} else {
+		port.manager = m
+		return
+	}
+}
+
+func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
+	args := &struct {
+		manager           *Manager
+		ID                string              `json:"id"`
+		IpAddress         *string             `json:"ip_address,omitempty"`
+		Network           string              `json:"network"`
+		Router            string              `json:"router,omitempty"`
+		Vm                string              `json:"vm,omitempty"`
+		Lbaas             string              `json:"lbaas,omitempty"`
+		FirewallTemplates []*FirewallTemplate `json:"fw_templates,omitempty"`
+	}{
+		ID:                port.ID,
+		IpAddress:         port.IpAddress,
+		Network:           port.Network.ID,
+		FirewallTemplates: port.FirewallTemplates,
+	}
+	switch v := toConnect.(type) {
+	case *Router:
+		args.Router = v.ID
+	case *Vm:
+		args.Vm = v.ID
+	default:
+		return fmt.Errorf("ERROR. Unknown type: %s", v)
+	}
+	if err := r.manager.Request("POST", "v1/port", args, &port); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (v *Vdc) CreateEmptyPort(port *Port) error {
+	var fwTemplates = make([]*string, 0)
+	for _, fwTemplate := range port.FirewallTemplates {
+		fwTemplates = append(fwTemplates, &fwTemplate.ID)
+	}
+	args := &struct {
+		manager     *Manager
+		ID          string    `json:"id"`
+		IpAddress   *string   `json:"ip_address,omitempty"`
+		Network     string    `json:"network"`
+		FwTemplates []*string `json:"fw_templates"`
+		Tags        []string  `json:"tags"`
+	}{
+		ID:          port.ID,
+		IpAddress:   port.IpAddress,
+		Network:     port.Network.ID,
+		FwTemplates: fwTemplates,
+		Tags:        convertTagsToNames(port.Tags),
+	}
+
+	if err := v.manager.Request("POST", "v1/port", args, &port); err != nil {
+		return err
+	} else {
+		port.manager = v.manager
+	}
+
+	return nil
 }
 
 func (p *Port) UpdateFirewall(firewallTemplates []*FirewallTemplate) error {
@@ -84,45 +157,11 @@ func (p *Port) ForceDelete() error {
 	return p.manager.Delete(path, Defaults(), nil)
 }
 
-func (r *Router) CreatePort(port *Port, toConnect interface{}) (err error) {
-	args := &struct {
-		manager           *Manager
-		ID                string              `json:"id"`
-		IpAddress         *string             `json:"ip_address,omitempty"`
-		Network           string              `json:"network"`
-		Router            string              `json:"router,omitempty"`
-		Vm                string              `json:"vm,omitempty"`
-		Lbaas             string              `json:"lbaas,omitempty"`
-		FirewallTemplates []*FirewallTemplate `json:"fw_templates,omitempty"`
-	}{
-		ID:                port.ID,
-		IpAddress:         port.IpAddress,
-		Network:           port.Network.ID,
-		FirewallTemplates: port.FirewallTemplates,
-	}
-	switch v := toConnect.(type) {
-	case *Router:
-		args.Router = v.ID
-	case *Vm:
-		args.Vm = v.ID
-	default:
-		return fmt.Errorf("ERROR. Unknown type: %s", v)
-	}
-	err = r.manager.Request("POST", "v1/port", args, &port)
-	return
-}
-
-func (m *Manager) GetPort(id string) (port *Port, err error) {
-	path, _ := url.JoinPath("v1/port", id)
-	err = m.Get(path, Defaults(), &port)
-	if err != nil {
-		return
-	}
-	port.manager = m
-	return
-}
-
-func (p Port) WaitLock() (err error) {
+func (p Port) WaitLock() error {
 	path, _ := url.JoinPath("v1/port", p.ID)
-	return loopWaitLock(p.manager, path)
+	if err := loopWaitLock(p.manager, path); err != nil {
+		return errors.Wrapf(err, "crash via WaitLock for Port")
+	} else {
+		return nil
+	}
 }
