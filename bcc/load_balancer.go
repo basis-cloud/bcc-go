@@ -52,48 +52,6 @@ func NewLoadBalancer(name string, vdc *Vdc, port *Port, floating *Port) LoadBala
 	return l
 }
 
-func (lb *LoadBalancer) Create() (err error) {
-	type customPort struct {
-		ID                string     `json:"id"`
-		IpAddress         *string    `json:"ip_address,omitempty"`
-		Network           string     `json:"network"`
-		FirewallTemplates *string    `json:"fw_templates,omitempty"`
-		Connected         *Connected `json:"connected"`
-	}
-	lbCreate := &struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-		Vdc  string `json:"vdc"`
-
-		Kubernetes *Kubernetes `json:"kubernetes"`
-		Port       customPort  `json:"port"`
-		Floating   *string     `json:"floating,omitempty"`
-		Tags       []string    `json:"tags"`
-	}{
-		Name: lb.Name,
-		Vdc:  lb.Vdc.ID,
-		Port: customPort{
-			ID:                lb.Port.ID,
-			IpAddress:         lb.Port.IpAddress,
-			Network:           lb.Port.Network.ID,
-			FirewallTemplates: nil,
-			Connected:         lb.Port.Connected,
-		},
-		Kubernetes: lb.Kubernetes,
-		Floating:   nil,
-		Tags:       convertTagsToNames(lb.Tags),
-	}
-	if lb.Floating != nil {
-		if lb.Floating.ID != "" {
-			lbCreate.Floating = &lb.Floating.ID
-		} else {
-			lbCreate.Floating = lb.Floating.IpAddress
-		}
-	}
-	err = lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb)
-	return
-}
-
 func (m *Manager) GetLoadBalancers(extraArgs ...Arguments) (lbaasList []*LoadBalancer, err error) {
 	args := Defaults()
 	args.merge(extraArgs)
@@ -138,7 +96,97 @@ func (m *Manager) GetLoadBalancer(id string) (lbaas *LoadBalancer, err error) {
 	return
 }
 
-func (lb *LoadBalancer) Update() (err error) {
+func (lb *LoadBalancer) Create() error {
+	type customPort struct {
+		ID                string     `json:"id"`
+		IpAddress         *string    `json:"ip_address,omitempty"`
+		Network           string     `json:"network"`
+		FirewallTemplates *string    `json:"fw_templates,omitempty"`
+		Connected         *Connected `json:"connected"`
+	}
+	lbCreate := &struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Vdc  string `json:"vdc"`
+
+		Kubernetes *Kubernetes `json:"kubernetes"`
+		Port       customPort  `json:"port"`
+		Floating   *string     `json:"floating,omitempty"`
+		Tags       []string    `json:"tags"`
+	}{
+		Name: lb.Name,
+		Vdc:  lb.Vdc.ID,
+		Port: customPort{
+			ID:                lb.Port.ID,
+			IpAddress:         lb.Port.IpAddress,
+			Network:           lb.Port.Network.ID,
+			FirewallTemplates: nil,
+			Connected:         lb.Port.Connected,
+		},
+		Kubernetes: lb.Kubernetes,
+		Floating:   nil,
+		Tags:       convertTagsToNames(lb.Tags),
+	}
+	if lb.Floating != nil {
+		if lb.Floating.ID != "" {
+			lbCreate.Floating = &lb.Floating.ID
+		} else {
+			lbCreate.Floating = lb.Floating.IpAddress
+		}
+	}
+	if err := lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) error {
+	type customPort struct {
+		ID                string     `json:"id"`
+		IpAddress         *string    `json:"ip_address,omitempty"`
+		Network           string     `json:"network"`
+		FirewallTemplates *string    `json:"fw_templates,omitempty"`
+		Connected         *Connected `json:"connected"`
+	}
+	lbCreate := &struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Vdc  string `json:"vdc"`
+
+		Kubernetes *Kubernetes `json:"kubernetes"`
+		Port       customPort  `json:"port"`
+		Floating   *string     `json:"floating"`
+		Tags       []string    `json:"tags"`
+	}{
+		Name: lb.Name,
+		Vdc:  lb.Vdc.ID,
+		Port: customPort{
+			ID:                lb.Port.ID,
+			IpAddress:         lb.Port.IpAddress,
+			Network:           lb.Port.Network.ID,
+			FirewallTemplates: nil,
+			Connected:         lb.Port.Connected,
+		},
+		Kubernetes: lb.Kubernetes,
+		Floating:   nil,
+		Tags:       convertTagsToNames(lb.Tags),
+	}
+
+	if lb.Floating != nil {
+		lbCreate.Floating = lb.Floating.IpAddress
+	}
+
+	if err := lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb); err != nil {
+		return err
+	} else {
+		lb.manager = v.manager
+	}
+
+	return nil
+}
+
+func (lb *LoadBalancer) Update() error {
 	path, _ := url.JoinPath("v1/lbaas", lb.ID)
 	args := &struct {
 		Name     string  `json:"name"`
@@ -158,12 +206,18 @@ func (lb *LoadBalancer) Update() (err error) {
 			args.Floating = lb.Floating.IpAddress
 		}
 	}
-	err = lb.manager.Request("PUT", path, args, lb)
-	lb.WaitLock()
-	return
+	if err := lb.manager.Request("PUT", path, args, lb); err != nil {
+		return err
+	} else {
+		if err = lb.WaitLock(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (lb *LoadBalancer) Delete() (err error) {
+func (lb *LoadBalancer) Delete() error {
 	path, _ := url.JoinPath("v1/lbaas", lb.ID)
 	return lb.manager.Delete(path, Defaults(), nil)
 
@@ -192,7 +246,25 @@ func NewLoadBalancerPoolMember(port int, weight int, vm *Vm) PoolMember {
 	return member
 }
 
-func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) (err error) {
+func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerPool, err error) {
+	args := Defaults()
+	args.merge(extraArgs)
+	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
+	err = lb.manager.GetSubItems(path, args, &pools)
+	return pools, err
+}
+
+func (lb *LoadBalancer) GetLoadBalancerPool(id string) (lbaas_pool LoadBalancerPool, err error) {
+	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
+	err = lb.manager.Get(path, Defaults(), &lbaas_pool)
+	if err != nil {
+		return
+	}
+	lbaas_pool.manager = lb.manager
+	return
+}
+
+func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) error {
 	type poolMember struct {
 		Port   int    `json:"port"`
 		Weight int    `json:"weight"`
@@ -228,11 +300,14 @@ func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) (err error) {
 	}
 
 	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
-	err = lb.manager.Request("POST", path, args, &pool)
-	return
+	if err := lb.manager.Request("POST", path, args, &pool); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) (err error) {
+func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
 	type poolMember struct {
 		Port   int    `json:"port"`
 		Weight int    `json:"weight"`
@@ -265,26 +340,11 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) (err error) {
 		SessionPersistence: pool.SessionPersistence,
 	}
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, pool.ID)
-	err = lb.manager.Request("PUT", path, lbCreatePool, &pool)
-	return
-}
-
-func (lb *LoadBalancer) GetLoadBalancerPool(id string) (lbaas_pool LoadBalancerPool, err error) {
-	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	err = lb.manager.Get(path, Defaults(), &lbaas_pool)
-	if err != nil {
-		return
+	if err := lb.manager.Request("PUT", path, lbCreatePool, &pool); err != nil {
+		return err
 	}
-	lbaas_pool.manager = lb.manager
-	return
-}
 
-func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerPool, err error) {
-	args := Defaults()
-	args.merge(extraArgs)
-	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
-	err = lb.manager.GetSubItems(path, args, &pools)
-	return pools, err
+	return nil
 }
 
 func (lb *LoadBalancer) DeletePools() error {
@@ -302,13 +362,16 @@ func (lb *LoadBalancer) DeletePools() error {
 	return nil
 }
 
-func (lb *LoadBalancer) DeletePool(id string) (err error) {
+func (lb *LoadBalancer) DeletePool(id string) error {
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	err = lb.manager.Delete(path, Defaults(), Defaults())
-	return
+	if err := lb.manager.Delete(path, Defaults(), Defaults()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (lb LoadBalancer) WaitLock() (err error) {
+func (lb LoadBalancer) WaitLock() error {
 	path, _ := url.JoinPath("v1/lbaas", lb.ID)
 	return loopWaitLock(lb.manager, path)
 }
