@@ -194,6 +194,7 @@ func (v *Vm) ConnectPort(port *Port, exsist bool) error {
 		Network     string   `json:"network"`
 		IpAddress   *string  `json:"ip_address,omitempty"`
 		FwTemplates []string `json:"fw_templates"`
+		Tags        []string `json:"tags"`
 	}
 
 	var fwTemplates = make([]string, len(port.FirewallTemplates))
@@ -205,6 +206,7 @@ func (v *Vm) ConnectPort(port *Port, exsist bool) error {
 		Network:     port.Network.ID,
 		IpAddress:   port.IpAddress,
 		FwTemplates: fwTemplates,
+		Tags:        convertTagsToNames(port.Tags),
 	}
 
 	var err error
