@@ -78,7 +78,7 @@ func (v *Vdc) CreateRouter(router *Router) error {
 	}
 
 	tempPorts := make([]*TempPortCreate, len(router.Ports))
-	for idx, port := range router.Routes {
+	for idx, port := range router.Ports {
 		tempPorts[idx] = &TempPortCreate{ID: port.ID}
 	}
 
