@@ -13,10 +13,10 @@ type NodePlatform struct {
 
 type Kubernetes struct {
 	manager *Manager
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Vdc     *Vdc   `json:"vdc"`
-	Vms     []*Vm  `json:"vms"`
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Vdc     *Vdc     `json:"vdc"`
+	Vms     []*TmpVm `json:"vms"`
 
 	Project       *Project            `json:"project"`
 	Floating      *Port               `json:"floating"`
