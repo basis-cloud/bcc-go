@@ -371,7 +371,7 @@ func (lb *LoadBalancer) DeletePools() error {
 
 func (lb *LoadBalancer) DeletePool(id string) error {
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	if err := lb.manager.Delete(path, Defaults(), Defaults()); err != nil {
+	if err := lb.manager.Delete(path, Defaults(), nil); err != nil {
 		return err
 	}
 
