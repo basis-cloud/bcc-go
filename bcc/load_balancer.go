@@ -22,12 +22,12 @@ type LoadBalancer struct {
 type LoadBalancerPool struct {
 	ID                 string        `json:"id"`
 	Port               int           `json:"port"`
-	CookieName         string        `json:"cookie_name,omitempty"`
+	CookieName         *string       `json:"cookie_name,omitempty"`
 	Connlimit          int           `json:"connlimit"`
 	Members            []*PoolMember `json:"members"`
-	Method             string        `json:"method,omitempty"`
-	Protocol           string        `json:"protocol,omitempty"`
-	SessionPersistence string        `json:"session_persistence,omitempty"`
+	Method             *string       `json:"method,omitempty"`
+	Protocol           *string       `json:"protocol,omitempty"`
+	SessionPersistence *string       `json:"session_persistence,omitempty"`
 
 	manager *Manager
 	Locked  bool `json:"locked"`
@@ -224,15 +224,30 @@ func (lb *LoadBalancer) Delete() error {
 
 }
 
-func NewLoadBalancerPool(lb LoadBalancer, port int, connlimit int, members []*PoolMember, method string, protocol string, session_persistence string) LoadBalancerPool {
+func NewLoadBalancerPool(
+	lb LoadBalancer, port int, connlimit int, members []*PoolMember,
+	method interface{}, protocol interface{}, sessionPersistence interface{}, cookieName interface{}) LoadBalancerPool {
 	lb_pool := LoadBalancerPool{
-		manager:            lb.manager,
-		Port:               port,
-		Connlimit:          connlimit,
-		Members:            members,
-		Method:             method,
-		Protocol:           protocol,
-		SessionPersistence: session_persistence,
+		manager:   lb.manager,
+		Port:      port,
+		Connlimit: connlimit,
+		Members:   members,
+	}
+	if method != nil {
+		method := method.(string)
+		lb_pool.Method = &method
+	}
+	if protocol != nil {
+		protocol := protocol.(string)
+		lb_pool.Protocol = &protocol
+	}
+	if sessionPersistence != nil {
+		sessionPersistence := sessionPersistence.(string)
+		lb_pool.SessionPersistence = &sessionPersistence
+	}
+	if cookieName != nil {
+		cookieName := cookieName.(string)
+		lb_pool.CookieName = &cookieName
 	}
 
 	return lb_pool
@@ -284,10 +299,10 @@ func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		CookieName         string        `json:"cookie_name,omitempty"`
-		Method             string        `json:"method,omitempty"`
-		Protocol           string        `json:"protocol,omitempty"`
-		SessionPersistence string        `json:"session_persistence,omitempty"`
+		CookieName         *string       `json:"cookie_name,omitempty"`
+		Method             *string       `json:"method,omitempty"`
+		Protocol           *string       `json:"protocol,omitempty"`
+		SessionPersistence *string       `json:"session_persistence,omitempty"`
 	}{
 		Port:               pool.Port,
 		Connlimit:          pool.Connlimit,
@@ -316,10 +331,10 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		Method             string        `json:"method,omitempty"`
-		Protocol           string        `json:"protocol,omitempty"`
-		CookieName         string        `json:"cookie_name,omitempty"`
-		SessionPersistence string        `json:"session_persistence,omitempty"`
+		Method             *string       `json:"method,omitempty"`
+		Protocol           *string       `json:"protocol,omitempty"`
+		CookieName         *string       `json:"cookie_name,omitempty"`
+		SessionPersistence *string       `json:"session_persistence,omitempty"`
 	}
 
 	var members []*poolMember
