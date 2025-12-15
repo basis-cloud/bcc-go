@@ -37,7 +37,7 @@ type PoolMember struct {
 	ID     string `json:"id"`
 	Port   int    `json:"port"`
 	Weight int    `json:"weight"`
-	Vm     *Vm    `json:"vm"`
+	Vm     *TmpVm `json:"vm"`
 }
 
 func NewLoadBalancer(name string, vdc *Vdc, port *Port, floating *Port) LoadBalancer {
@@ -238,7 +238,7 @@ func NewLoadBalancerPool(lb LoadBalancer, port int, connlimit int, members []*Po
 	return lb_pool
 }
 
-func NewLoadBalancerPoolMember(port int, weight int, vm *Vm) PoolMember {
+func NewLoadBalancerPoolMember(port int, weight int, vm *TmpVm) PoolMember {
 	member := PoolMember{
 		Weight: weight,
 		Vm:     vm,
