@@ -72,3 +72,23 @@ func (d *Dns) Delete() error {
 	path, _ := url.JoinPath("v1/dns", d.ID)
 	return d.manager.Delete(path, Defaults(), nil)
 }
+
+func (d *Dns) Update() error {
+	path, _ := url.JoinPath("v1/dns", d.ID)
+
+	args := &struct {
+		Name    string   `json:"name"`
+		Project string   `json:"project"`
+		Tags    []string `json:"tags"`
+	}{
+		Name:    d.Name,
+		Project: d.Project.ID,
+		Tags:    convertTagsToNames(d.Tags),
+	}
+
+	if err := d.manager.Request("PUT", path, args, d); err != nil {
+		return err
+	}
+
+	return nil
+}
