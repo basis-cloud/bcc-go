@@ -21,8 +21,8 @@ type Router struct {
 	Tags      []Tag    `json:"tags"`
 }
 
-func NewRouter(name string, floating *string) Router {
-	r := Router{Name: name}
+func NewRouter(name string, floating *string, vdc string) Router {
+	r := Router{Name: name, Vdc: &Vdc{ID: vdc}}
 	if floating != nil {
 		r.Floating = &Port{IpAddress: floating}
 	}
