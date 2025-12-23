@@ -2,11 +2,10 @@ package bcc
 
 import (
 	"net/url"
-	"strconv"
 )
 
 type PaasInputDescription struct {
-	ID          int                    `json:"id"`
+	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Value       string                 `json:"value"`
@@ -17,7 +16,7 @@ type PaasInputDescription struct {
 
 type PaasTemplate struct {
 	manager      *Manager
-	ID           int      `json:"id"`
+	ID           string   `json:"id"`
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	DisplayName  string   `json:"display_name"`
@@ -72,10 +71,10 @@ func (m *Manager) GetPaasTemplates(vdcId string, extraArgs ...Arguments) ([]*Paa
 	return templates, nil
 }
 
-func (m *Manager) GetPaasTemplate(id int, vdcId string) (*PaasTemplate, error) {
+func (m *Manager) GetPaasTemplate(id string, vdcId string) (*PaasTemplate, error) {
 	var template *PaasTemplate
 	args := Arguments{"vdc_id": vdcId}
-	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(id))
+	path, _ := url.JoinPath("v1/paas_template", id)
 	if err := m.Get(path, args, &template); err != nil {
 		return nil, err
 	}
@@ -84,7 +83,7 @@ func (m *Manager) GetPaasTemplate(id int, vdcId string) (*PaasTemplate, error) {
 }
 
 func (p *PaasTemplate) GetPaasTemplateInputs(projectId string, extraArgs ...Arguments) ([]*PaasInputDescription, error) {
-	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(p.ID), "inputs")
+	path, _ := url.JoinPath("v1/paas_template", p.ID, "inputs")
 	response := struct {
 		Inputs []*PaasInputDescription `json:"inputs"`
 	}{}
@@ -141,11 +140,11 @@ func (m *Manager) CreatePaasService(p *PaasService) error {
 
 func (p *PaasService) Update() error {
 	args := struct {
-		Name          string                 `json:"name"`
-		Inputs        map[string]interface{} `json:"paas_service_inputs"`
+		Name   string                 `json:"name"`
+		Inputs map[string]interface{} `json:"paas_service_inputs"`
 	}{
-		Name:          p.Name,
-		Inputs:        p.Inputs,
+		Name:   p.Name,
+		Inputs: p.Inputs,
 	}
 	path, _ := url.JoinPath("v1/paas_service", p.ID)
 	return p.manager.Request("PUT", path, args, p)
