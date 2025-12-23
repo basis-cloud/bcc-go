@@ -175,7 +175,7 @@ func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) error {
 	}
 
 	if lb.Floating != nil {
-		lbCreate.Floating = lb.Floating.IpAddress
+		lbCreate.Floating = &lb.Floating.ID
 	}
 
 	if err := lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb); err != nil {
