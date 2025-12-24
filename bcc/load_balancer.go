@@ -290,10 +290,10 @@ func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		CookieName         *string       `json:"cookie_name,omitempty"`
-		Method             string        `json:"method,omitempty"`
-		Protocol           string        `json:"protocol,omitempty"`
-		SessionPersistence string        `json:"session_persistence,omitempty"`
+		CookieName         *string       `json:"cookie_name"`
+		Method             string        `json:"method"`
+		Protocol           string        `json:"protocol"`
+		SessionPersistence string        `json:"session_persistence"`
 	}{
 		Port:               pool.Port,
 		Connlimit:          pool.Connlimit,
@@ -322,10 +322,10 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		Method             string        `json:"method,omitempty"`
-		Protocol           string        `json:"protocol,omitempty"`
-		CookieName         *string       `json:"cookie_name,omitempty"`
-		SessionPersistence string        `json:"session_persistence,omitempty"`
+		Method             string        `json:"method"`
+		Protocol           string        `json:"protocol"`
+		CookieName         *string       `json:"cookie_name"`
+		SessionPersistence string        `json:"session_persistence"`
 	}
 
 	var members []*poolMember
