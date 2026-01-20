@@ -11,6 +11,7 @@ type StorageProfile struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	MaxDiskSize int    `json:"max_disk_size"`
+	Enabled     bool   `json:"enabled"`
 }
 
 func (v *Vdc) GetStorageProfiles(extraArgs ...Arguments) (storageProfiles []*StorageProfile, err error) {
