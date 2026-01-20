@@ -17,6 +17,7 @@ type Port struct {
 	Connected         *Connected          `json:"connected"`
 	Locked            bool                `json:"locked"`
 	Tags              []Tag               `json:"tags"`
+	Vdc               *Vdc                `json:"vdc,omitempty"`
 }
 
 type Connected struct {
@@ -63,16 +64,18 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 		manager           *Manager
 		ID                string              `json:"id"`
 		IpAddress         *string             `json:"ip_address,omitempty"`
-		Network           string              `json:"network"`
+		Network           string              `json:"network,omitempty"`
 		Router            string              `json:"router,omitempty"`
 		Vm                string              `json:"vm,omitempty"`
 		Lbaas             string              `json:"lbaas,omitempty"`
 		FirewallTemplates []*FirewallTemplate `json:"fw_templates,omitempty"`
+		Vdc               *Vdc                `json:"vdc,omitempty"`
 	}{
 		ID:                port.ID,
 		IpAddress:         port.IpAddress,
 		Network:           port.Network.ID,
 		FirewallTemplates: port.FirewallTemplates,
+		Vdc:               port.Vdc,
 	}
 	switch v := toConnect.(type) {
 	case *Router:
@@ -97,15 +100,17 @@ func (v *Vdc) CreateEmptyPort(port *Port) error {
 		manager     *Manager
 		ID          string    `json:"id"`
 		IpAddress   *string   `json:"ip_address,omitempty"`
-		Network     string    `json:"network"`
+		Network     string    `json:"network,omitempty"`
 		FwTemplates []*string `json:"fw_templates"`
 		Tags        []string  `json:"tags"`
+		Vdc         *Vdc      `json:"vdc,omitempty"`
 	}{
 		ID:          port.ID,
 		IpAddress:   port.IpAddress,
 		Network:     port.Network.ID,
 		FwTemplates: fwTemplates,
 		Tags:        convertTagsToNames(port.Tags),
+		Vdc:         port.Vdc,
 	}
 
 	if err := v.manager.Request("POST", "v1/port", args, &port); err != nil {
