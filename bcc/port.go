@@ -69,17 +69,20 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 		Vm                string              `json:"vm,omitempty"`
 		Lbaas             string              `json:"lbaas,omitempty"`
 		FirewallTemplates []*FirewallTemplate `json:"fw_templates,omitempty"`
-		Vdc               *Vdc                `json:"vdc,omitempty"`
+		Vdc               *string             `json:"vdc,omitempty"`
 	}{
 		ID:                port.ID,
 		IpAddress:         port.IpAddress,
 		Network:           nil,
 		FirewallTemplates: port.FirewallTemplates,
-		Vdc:               port.Vdc,
+		Vdc:               nil,
 	}
 
 	if port.Network != nil {
 		args.Network = &port.Network.ID
+	}
+	if port.Vdc != nil {
+		args.Vdc = &port.Vdc.ID
 	}
 
 	switch v := toConnect.(type) {
@@ -109,18 +112,21 @@ func (v *Vdc) CreateEmptyPort(port *Port) error {
 		Network     *string   `json:"network,omitempty"`
 		FwTemplates []*string `json:"fw_templates"`
 		Tags        []string  `json:"tags"`
-		Vdc         *Vdc      `json:"vdc,omitempty"`
+		Vdc         *string   `json:"vdc,omitempty"`
 	}{
 		ID:          port.ID,
 		IpAddress:   port.IpAddress,
 		Network:     nil,
 		FwTemplates: fwTemplates,
 		Tags:        convertTagsToNames(port.Tags),
-		Vdc:         port.Vdc,
+		Vdc:         nil,
 	}
 
 	if port.Network != nil {
 		args.Network = &port.Network.ID
+	}
+	if port.Vdc != nil {
+		args.Vdc = &port.Vdc.ID
 	}
 
 	if err := v.manager.Request("POST", "v1/port", args, &port); err != nil {
