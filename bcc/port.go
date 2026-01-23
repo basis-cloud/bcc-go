@@ -64,7 +64,7 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 		manager           *Manager
 		ID                string              `json:"id"`
 		IpAddress         *string             `json:"ip_address,omitempty"`
-		Network           string              `json:"network,omitempty"`
+		Network           *string             `json:"network,omitempty"`
 		Router            string              `json:"router,omitempty"`
 		Vm                string              `json:"vm,omitempty"`
 		Lbaas             string              `json:"lbaas,omitempty"`
@@ -73,10 +73,15 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 	}{
 		ID:                port.ID,
 		IpAddress:         port.IpAddress,
-		Network:           port.Network.ID,
+		Network:           nil,
 		FirewallTemplates: port.FirewallTemplates,
 		Vdc:               port.Vdc,
 	}
+
+	if port.Network != nil {
+		args.Network = &port.Network.ID
+	}
+
 	switch v := toConnect.(type) {
 	case *Router:
 		args.Router = v.ID
@@ -85,6 +90,7 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 	default:
 		return fmt.Errorf("ERROR. Unknown type: %s", v)
 	}
+
 	if err := r.manager.Request("POST", "v1/port", args, &port); err != nil {
 		return err
 	}
@@ -100,17 +106,21 @@ func (v *Vdc) CreateEmptyPort(port *Port) error {
 		manager     *Manager
 		ID          string    `json:"id"`
 		IpAddress   *string   `json:"ip_address,omitempty"`
-		Network     string    `json:"network,omitempty"`
+		Network     *string   `json:"network,omitempty"`
 		FwTemplates []*string `json:"fw_templates"`
 		Tags        []string  `json:"tags"`
 		Vdc         *Vdc      `json:"vdc,omitempty"`
 	}{
 		ID:          port.ID,
 		IpAddress:   port.IpAddress,
-		Network:     port.Network.ID,
+		Network:     nil,
 		FwTemplates: fwTemplates,
 		Tags:        convertTagsToNames(port.Tags),
 		Vdc:         port.Vdc,
+	}
+
+	if port.Network != nil {
+		args.Network = &port.Network.ID
 	}
 
 	if err := v.manager.Request("POST", "v1/port", args, &port); err != nil {
