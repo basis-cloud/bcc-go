@@ -29,13 +29,15 @@ const TaskTimeout = 600  // seconds
 const KubeCtlConfigURL = `/v1/kubernetes/([^/]+)/config`
 
 type Manager struct {
-	Client    *http.Client
-	ClientID  string
-	Logger    logger
-	BaseURL   string
-	Token     string
-	UserAgent string
-	ctx       context.Context
+	Client          *http.Client
+	ClientID        string
+	Logger          logger
+	BaseURL         string
+	Token           string
+	RequestTimeout  time.Duration
+	RequestInterval time.Duration
+	UserAgent       string
+	ctx             context.Context
 }
 
 func loadCertificatesFromFile(CertPath string) (*x509.CertPool, error) {
@@ -128,7 +130,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 		if err != nil {
 			return nil, err
 		}
-    
+
 		client = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -139,7 +141,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 				},
 			},
 		}
-    
+
 	} else if insecure == true {
 		client = &http.Client{
 			Transport: &http.Transport{
@@ -149,7 +151,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 				},
 			},
 		}
-    
+
 	} else {
 		client = &http.Client{
 			Transport: &http.Transport{},
@@ -158,7 +160,7 @@ func NewManager(token string, caCert string, cert string, certKey string, insecu
 
 	return &Manager{
 
-		Client:    client,
+		Client: client,
 
 		BaseURL:   DefaultBaseURL,
 		Token:     token,
@@ -174,28 +176,25 @@ func (m *Manager) WithContext(ctx context.Context) *Manager {
 }
 
 func (m *Manager) Request(method string, path string, args interface{}, target interface{}) error {
-	m.log("[bcc] %s %s", method, path)
+	m.log("[request-info] method:%s path:%s payload:%s", method, path, args)
 
 	res, err := json.Marshal(args)
 	if err != nil {
 		return err
 	}
 
-	m.log("[bcc] Send %s", res)
+	requestUrl, _ := url.JoinPath(m.BaseURL, path)
 
-	request_url, _ := url.JoinPath(m.BaseURL, path)
-
-	req, err := http.NewRequest(method, request_url, bytes.NewReader(res))
+	req, err := http.NewRequest(method, requestUrl, bytes.NewReader(res))
 	if err != nil {
-		return errors.Wrapf(err, "Invalid %s request %s", method, request_url)
+		return errors.Wrapf(err, "[request-error] Invalid %s request %s", method, requestUrl)
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
 	req.Header.Set("Content-Type", "application/json")
-
 	req = req.WithContext(m.ctx)
 
-	taskIds, err := m.do(req, request_url, target, res)
+	taskIds, err := m.do(req, requestUrl, target, res)
 	m.waitTasks(taskIds)
 
 	return err
@@ -371,16 +370,26 @@ func (m *Manager) sleep(dur time.Duration) error {
 	return nil
 }
 
-// TODO: добавить 10 минут таймаута
 func (m *Manager) do(req *http.Request, url string, target interface{}, requestBody []byte) (string, error) {
 	req.Header.Set("Accept-Language", "ru-ru")
-	var locked_object ObjectLocked
 
-	start := time.Now()
+	var lockedObject ObjectLocked
 	var resp *http.Response
+
+	ctx, cancel := context.WithTimeout(m.ctx, m.RequestTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(m.RequestInterval)
+	defer ticker.Stop()
 
 	for {
 		m.log("[bcc] Perform %s...", req.Method)
+
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-ticker.C:
+		}
 
 		req.Body = io.NopCloser(bytes.NewReader(requestBody))
 		resp_, err := m.Client.Do(req)
@@ -392,35 +401,23 @@ func (m *Manager) do(req *http.Request, url string, target interface{}, requestB
 
 		if resp_.StatusCode == 409 {
 			m.log("[bcc] Object '%s' locked. Try again in %dms...", url, RetryTime)
+
 			body, err := io.ReadAll(resp_.Body)
-			err = json.Unmarshal(body, &locked_object)
+			err = json.Unmarshal(body, &lockedObject)
 
 			if err != nil {
 				return "", errors.Wrapf(err, "HTTP Read error on response for %s", url)
 			}
 
-			if locked_object.ErrorAlias != nil {
-				error_alias := fmt.Sprintf("%v", locked_object.ErrorAlias[0])
-				error_details, _ := json.Marshal(locked_object.Details)
-				error_data := fmt.Sprintf("%v", locked_object.NonFieldErrors[0])
-				if error_alias != "object_locked" {
-					error_body := fmt.Sprintf("%s: %s", error_data, string(error_details))
-					return "", errors.New(error_body)
+			if lockedObject.ErrorAlias != nil {
+				errorAlias := fmt.Sprintf("%v", lockedObject.ErrorAlias[0])
+				errorDetails, _ := json.Marshal(lockedObject.Details)
+				errorData := fmt.Sprintf("%v", lockedObject.NonFieldErrors[0])
+				if errorAlias != "object_locked" {
+					errorBody := fmt.Sprintf("%s: %s", errorData, string(errorDetails))
+					return "", errors.New(errorBody)
 				}
 			}
-
-			if err := m.sleep(RetryTime * time.Millisecond); err != nil {
-				return "", err
-			}
-
-			elapsedTime := time.Since(start)
-
-			if elapsedTime.Seconds() > float64(LockTimeout) {
-				m.log("[bcc] Waiting unlock for '%s' took more than %ds", url, LockTimeout)
-				return "", errors.New("Lock timeout")
-			}
-
-			continue // try again
 		}
 
 		resp = resp_
