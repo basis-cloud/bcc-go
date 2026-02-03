@@ -85,15 +85,25 @@ func loopWaitLock(manager *Manager, path string) (err error) {
 		Locked bool `json:"locked"`
 	}
 
+	ctx, cancel := context.WithTimeout(manager.ctx, manager.RequestTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(manager.RequestInterval)
+	defer ticker.Stop()
+
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+
 		if err = manager.Get(path, Defaults(), &wait); err != nil {
 			return err
 		}
-		if !wait.Locked {
-			break
-		}
-		time.Sleep(time.Second)
-	}
 
-	return nil
+		if !wait.Locked {
+			return nil
+		}
+	}
 }
