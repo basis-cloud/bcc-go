@@ -92,18 +92,19 @@ func loopWaitLock(manager *Manager, path string) (err error) {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-
 		if err = manager.Get(path, Defaults(), &wait); err != nil {
 			return err
 		}
 
 		if !wait.Locked {
 			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			manager.log("[ERROR] crash via waitlock unlock for '%s' took more than %ds", path, manager.RequestTimeout.Seconds())
+			return ctx.Err()
+		case <-ticker.C:
 		}
 	}
 }
