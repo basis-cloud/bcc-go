@@ -385,12 +385,6 @@ func (m *Manager) do(req *http.Request, url string, target interface{}, requestB
 	for {
 		m.log("[bcc] Perform %s...", req.Method)
 
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-ticker.C:
-		}
-
 		req.Body = io.NopCloser(bytes.NewReader(requestBody))
 		resp_, err := m.Client.Do(req)
 		if err != nil {
@@ -418,6 +412,15 @@ func (m *Manager) do(req *http.Request, url string, target interface{}, requestB
 					return "", errors.New(errorBody)
 				}
 			}
+
+			select {
+			case <-ctx.Done():
+				m.log("[request-err] Waiting unlock for '%s' took more than %ds", url, m.RequestTimeout.Seconds())
+				return "", ctx.Err()
+			case <-ticker.C:
+			}
+
+			continue
 		}
 
 		resp = resp_
