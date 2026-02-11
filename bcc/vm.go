@@ -134,6 +134,7 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		Ram            float64           `json:"ram"`
 		Vdc            string            `json:"vdc"`
 		Template       string            `json:"template"`
+		HotAdd         bool              `json:"hotadd_feature"`
 		Ports          []*TempPortCreate `json:"ports"`
 		Metadata       []*TempFields     `json:"metadata"`
 		UserData       *string           `json:"user_data,omitempty"`
@@ -148,6 +149,7 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		Ram:            vm.Ram,
 		Vdc:            v.ID,
 		Template:       vm.Template.ID,
+		HotAdd:         vm.HotAdd,
 		Ports:          tempPorts,
 		Metadata:       tempFields,
 		UserData:       vm.UserData,
