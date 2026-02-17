@@ -300,7 +300,7 @@ func (v *Vm) Update() error {
 		Floating       *string  `json:"floating"`
 		Tags           []string `json:"tags"`
 	}{
-		AffinityGroups: nil,
+		AffinityGroups: _affGr,
 		Name:           v.Name,
 		Description:    v.Description,
 		Cpu:            v.Cpu,
