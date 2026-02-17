@@ -291,7 +291,7 @@ func (v *Vm) Update() error {
 	}
 
 	args := &struct {
-		AffinityGroups []string `json:"affinity_groups,omitempty"`
+		AffinityGroups []string `json:"affinity_groups"`
 		Name           string   `json:"name"`
 		Description    string   `json:"description"`
 		Cpu            int      `json:"cpu"`
