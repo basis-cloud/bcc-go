@@ -282,11 +282,11 @@ func (v *Vm) Reload() error {
 
 func (v *Vm) Update() error {
 	path, _ := url.JoinPath("v1/vm", v.ID)
-	var _affGr []string
+	affGr := make([]string, 0)
 
 	if v.AffinityGroups != nil && len(v.AffinityGroups) > 0 {
 		for _, group := range v.AffinityGroups {
-			_affGr = append(_affGr, group.ID)
+			affGr = append(affGr, group.ID)
 		}
 	}
 
@@ -300,7 +300,7 @@ func (v *Vm) Update() error {
 		Floating       *string  `json:"floating"`
 		Tags           []string `json:"tags"`
 	}{
-		AffinityGroups: _affGr,
+		AffinityGroups: affGr,
 		Name:           v.Name,
 		Description:    v.Description,
 		Cpu:            v.Cpu,
