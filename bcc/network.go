@@ -13,6 +13,7 @@ type Network struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	IsDefault bool   `json:"is_default"`
+	External  bool   `json:"external"`
 	Mtu       *int   `json:"mtu,omitempty"`
 	Vdc       struct {
 		Id   string `json:"id"`
