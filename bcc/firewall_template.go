@@ -10,6 +10,7 @@ type FirewallTemplate struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	RulesCount  int    `json:"rules_count"`
 	Locked      bool   `json:"locked"`
 	Tags        []Tag  `json:"tags"`
 	Vdc         *Vdc   `json:"vdc,omitempty"`
