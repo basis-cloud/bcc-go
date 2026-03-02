@@ -5,12 +5,14 @@ import (
 )
 
 type Hypervisor struct {
-	manager  *Manager
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	CpuPerVm int    `json:"cpu_per_vm"`
-	RamPerVm int    `json:"ram_per_vm"`
+	manager        *Manager
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	CpuPerVm       int    `json:"cpu_per_vm"`
+	RamPerVm       int    `json:"ram_per_vm"`
+	PortsPerDevice int    `json:"ports_per_device"`
+	DisksPerVm     int    `json:"disks_per_vm"`
 }
 
 func (p *Project) GetAvailableHypervisors(extraArgs ...Arguments) (hypervisors []*Hypervisor, err error) {
