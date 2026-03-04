@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -187,7 +188,8 @@ func (m *Manager) Request(method string, path string, args interface{}, target i
 
 	req, err := http.NewRequest(method, requestUrl, bytes.NewReader(res))
 	if err != nil {
-		return errors.Wrapf(err, "[request-error] Invalid %s request %s", method, requestUrl)
+		log.Printf("[request-error] Invalid %s request %s", method, requestUrl)
+		return err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
@@ -210,7 +212,8 @@ func (m *Manager) Get(path string, args Arguments, target interface{}) error {
 
 	req, err := http.NewRequest("GET", urlWithParams, nil)
 	if err != nil {
-		return errors.Wrapf(err, "Invalid GET request %s", request_url)
+		log.Printf("Invalid GET request %s", request_url)
+		return err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
@@ -243,7 +246,8 @@ func (m *Manager) GetItems(path string, args Arguments, target interface{}) erro
 
 		req, err := http.NewRequest("GET", urlWithParams, nil)
 		if err != nil {
-			return errors.Wrapf(err, "Invalid GET request %s", request_url)
+			log.Printf("Invalid GET request %s", request_url)
+			return err
 		}
 
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
@@ -284,18 +288,19 @@ func (m *Manager) GetSubItems(path string, args Arguments, target interface{}) e
 
 	m.log("[bcc] GET %s", path)
 
-	request_url, _ := url.JoinPath(m.BaseURL, path)
+	requestUrl, _ := url.JoinPath(m.BaseURL, path)
 
-	req, err := http.NewRequest("GET", request_url, nil)
+	req, err := http.NewRequest("GET", requestUrl, nil)
 	if err != nil {
-		return errors.Wrapf(err, "Invalid GET request %s", request_url)
+		log.Printf("Invalid GET request %s", requestUrl)
+		return err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
 
 	req = req.WithContext(m.ctx)
 
-	_, err = m.do(req, request_url, target, nil)
+	_, err = m.do(req, requestUrl, target, nil)
 	if err != nil {
 		return err
 	}
@@ -310,7 +315,8 @@ func (m *Manager) Delete(path string, args Arguments, target interface{}) error 
 
 	req, err := http.NewRequest("DELETE", request_url, nil)
 	if err != nil {
-		return errors.Wrapf(err, "Invalid DELETE request %s", request_url)
+		log.Printf("Invalid DELETE request %s", request_url)
+		return err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.Token))
