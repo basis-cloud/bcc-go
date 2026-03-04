@@ -24,7 +24,7 @@ func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*A
 	args.merge(extraArgs)
 
 	path := "v1/affinity_group"
-	err = m.Get(path, args, &affinityGroups)
+	err = m.GetItems(path, args, &affinityGroups)
 
 	for i := range affinityGroups {
 		affinityGroups[i].manager = m
