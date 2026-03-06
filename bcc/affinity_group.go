@@ -27,7 +27,6 @@ func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*A
 
 	for i := range affinityGroups {
 		affinityGroups[i].manager = m
-		affinityGroups[i].Vdc.manager = m
 	}
 
 	return
@@ -49,7 +48,6 @@ func (m *Manager) GetAffinityGroup(id string) (affinityGroup *AffinityGroup, err
 	}
 
 	affinityGroup.manager = m
-	affinityGroup.Vdc.manager = m
 
 	return
 }
