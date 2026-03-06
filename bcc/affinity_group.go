@@ -8,7 +8,6 @@ type AffinityGroup struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Policy      string      `json:"policy"`
-	Reboot      bool        `json:"reboot,omitempty"`
 	Vms         []*MetaData `json:"vms,omitempty"`
 	Vdc         *Vdc        `json:"vdc"`
 	Locked      bool        `json:"locked,omitempty"`
@@ -16,7 +15,7 @@ type AffinityGroup struct {
 }
 
 func NewAffinityGroup(name string, description string, policy string, vms []*MetaData) AffinityGroup {
-	return AffinityGroup{Name: name, Description: description, Policy: policy, Vms: vms, Reboot: false}
+	return AffinityGroup{Name: name, Description: description, Policy: policy, Vms: vms}
 }
 
 func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*AffinityGroup, err error) {
@@ -29,7 +28,6 @@ func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*A
 	for i := range affinityGroups {
 		affinityGroups[i].manager = m
 		affinityGroups[i].Vdc.manager = m
-		affinityGroups[i].Reboot = false
 	}
 
 	return
@@ -52,7 +50,6 @@ func (m *Manager) GetAffinityGroup(id string) (affinityGroup *AffinityGroup, err
 
 	affinityGroup.manager = m
 	affinityGroup.Vdc.manager = m
-	affinityGroup.Reboot = false
 
 	return
 }
@@ -62,14 +59,12 @@ func (v *Vdc) CreateAffinityGroup(affinityGroup *AffinityGroup) error {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
 		Policy      string   `json:"policy"`
-		Reboot      bool     `json:"reboot"`
 		Vms         []string `json:"vms,omitempty"`
 		Vdc         string   `json:"vdc"`
 	}{
 		Name:        affinityGroup.Name,
 		Description: affinityGroup.Description,
 		Policy:      affinityGroup.Policy,
-		Reboot:      affinityGroup.Reboot,
 		Vms:         convertNameToId(affinityGroup.Vms),
 		Vdc:         v.ID,
 	}
@@ -94,7 +89,6 @@ func (a *AffinityGroup) Reload() error {
 
 	a.manager = m
 	a.Vdc.manager = m
-	a.Reboot = false
 
 	return nil
 }
@@ -106,13 +100,11 @@ func (a *AffinityGroup) Update() error {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
 		Policy      string   `json:"policy"`
-		Reboot      bool     `json:"reboot"`
 		Vms         []string `json:"vms,omitempty"`
 	}{
 		Name:        a.Name,
 		Description: a.Description,
 		Policy:      a.Policy,
-		Reboot:      a.Reboot,
 		Vms:         convertNameToId(a.Vms),
 	}
 
