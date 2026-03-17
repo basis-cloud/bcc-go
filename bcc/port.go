@@ -33,33 +33,38 @@ func NewPort(network *Network, firewallTemplates []*FirewallTemplate, ipAddress 
 }
 
 func (v *Vdc) GetPorts(extraArgs ...Arguments) (ports []*Port, err error) {
+	path := "v1/port"
 	args := Arguments{
 		"vdc": v.ID,
 	}
-
 	args.merge(extraArgs)
 
-	path := "v1/port"
-	err = v.manager.GetItems(path, args, &ports)
-	for i := range ports {
-		ports[i].manager = v.manager
-		ports[i].Network.manager = v.manager
+	if err = v.manager.GetItems(path, args, &ports); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-ports was failed: %s", err)
+	} else {
+		for i := range ports {
+			ports[i].manager = v.manager
+			ports[i].Network.manager = v.manager
+		}
 	}
+
 	return
 }
 
 func (m *Manager) GetPort(id string) (port *Port, err error) {
 	path, _ := url.JoinPath("v1/port", id)
+
 	if err = m.Get(path, Defaults(), &port); err != nil {
 		log.Printf("[REQUEST-ERROR]: getting port-%s was failed: %s]", id, errors.WithStack(err))
-		return nil, err
 	} else {
 		port.manager = m
-		return
 	}
+
+	return
 }
 
-func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
+func (r *Router) CreatePort(port *Port, toConnect interface{}) (err error) {
+	path := "v1/port"
 	args := &struct {
 		manager           *Manager
 		ID                string              `json:"id"`
@@ -94,13 +99,15 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) error {
 		return fmt.Errorf("ERROR. Unknown type: %s", v)
 	}
 
-	if err := r.manager.Request("POST", "v1/port", args, &port); err != nil {
-		return err
+	if err = r.manager.Request("POST", path, args, &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: creating port-%s was failed: %s", port.ID, err)
 	}
-	return nil
+
+	return
 }
 
-func (v *Vdc) CreateEmptyPort(port *Port) error {
+func (v *Vdc) CreateEmptyPort(port *Port) (err error) {
+	path := "v1/port"
 	var fwTemplates = make([]*string, 0)
 	for _, fwTemplate := range port.FirewallTemplates {
 		fwTemplates = append(fwTemplates, &fwTemplate.ID)
@@ -129,13 +136,13 @@ func (v *Vdc) CreateEmptyPort(port *Port) error {
 		args.Vdc = &port.Vdc.ID
 	}
 
-	if err := v.manager.Request("POST", "v1/port", args, &port); err != nil {
-		return err
+	if err = v.manager.Request("POST", path, args, &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: creating port-%s was failed: %s", port.ID, err)
 	} else {
 		port.manager = v.manager
 	}
 
-	return nil
+	return
 }
 
 func (p *Port) UpdateFirewall(firewallTemplates []*FirewallTemplate) error {
@@ -148,7 +155,7 @@ func (p *Port) UpdateIpAddress(ip_address *string) error {
 	return p.Update()
 }
 
-func (p *Port) Update() error {
+func (p *Port) Update() (err error) {
 	path, _ := url.JoinPath("v1/port", p.ID)
 	fwTemplates := make([]*string, 0)
 	for _, fwTemplate := range p.FirewallTemplates {
@@ -165,7 +172,12 @@ func (p *Port) Update() error {
 		SecurityRules: []string{},
 		Tags:          convertTagsToNames(p.Tags),
 	}
-	return p.manager.Request("PUT", path, args, p)
+
+	if err = p.manager.Request("PUT", path, args, p); err != nil {
+		log.Printf("[REQUEST-ERROR]: updating port-%s was failed: %s", p.ID, err)
+	}
+
+	return
 }
 
 func (p *Port) Delete() error {
@@ -178,11 +190,12 @@ func (p *Port) ForceDelete() error {
 	return p.manager.Delete(path, Defaults(), nil)
 }
 
-func (p Port) WaitLock() error {
+func (p Port) WaitLock() (err error) {
 	path, _ := url.JoinPath("v1/port", p.ID)
-	if err := loopWaitLock(p.manager, path); err != nil {
-		return errors.Wrapf(err, "crash via WaitLock for Port")
-	} else {
-		return nil
+
+	if err = loopWaitLock(p.manager, path); err != nil {
+		log.Printf("[REQUEST-ERROR]: wait-lock for port-%s was failed: %s", p.ID, err)
 	}
+
+	return
 }
