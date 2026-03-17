@@ -188,7 +188,7 @@ func (m *Manager) Request(method string, path string, args interface{}, target i
 
 	req, err := http.NewRequest(method, requestUrl, bytes.NewReader(res))
 	if err != nil {
-		log.Printf("[request-error] Invalid %s request %s", method, requestUrl)
+		log.Printf("[REQUEST-ERROR] Invalid %s request %s", method, requestUrl)
 		return err
 	}
 
@@ -469,6 +469,9 @@ func (m *Manager) do(req *http.Request, url string, target interface{}, requestB
 		}
 	} else {
 		err = json.Unmarshal(b, target)
+		log.Printf("Unmarshalled response: %+v", target)
+		log.Printf("%s", b)
+		log.Printf("%s", string(b))
 		if err != nil {
 			return "", errors.Wrapf(err, "JSON decode failed on %s:\n%s", url, string(b))
 		}

@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 )
 
 type PubKey struct {
@@ -12,30 +13,38 @@ type PubKey struct {
 	PublicKey   string `json:"public_key"`
 }
 
-func (m *Manager) GetPublicKeys(account_id string) (public_keys []*PubKey, err error) {
-	path := fmt.Sprintf("/v1/account/%s/key", account_id)
-	err = m.GetItems(path, Defaults(), &public_keys)
-	for i := range public_keys {
-		public_keys[i].manager = m
+func (m *Manager) GetPublicKeys(accountId string) (publicKeys []*PubKey, err error) {
+	path := fmt.Sprintf("/v1/account/%s/key", accountId)
+
+	if err = m.GetItems(path, Defaults(), &publicKeys); err != nil {
+		log.Printf("[REQUEST-ERROR] get-public-keys was failed: %s", err)
+	} else {
+		for i := range publicKeys {
+			publicKeys[i].manager = m
+		}
 	}
+
 	return
 }
 
-func (a *Account) GetPublicKeys() (public_keys []*PubKey, err error) {
-	public_keys, err = a.manager.GetPublicKeys(a.ID)
-	if err != nil {
-		return nil, err
-	}
-	return public_keys, nil
+func (a *Account) GetPublicKeys() (publicKeys []*PubKey, err error) {
+	publicKeys, err = a.manager.GetPublicKeys(a.ID)
+	return
 }
 
-func (m *Manager) GetPublicKey(id string) (pub_key *PubKey, err error) {
+func (m *Manager) GetPublicKey(id string) (publicKey *PubKey, err error) {
 	account, err := m.GetAccount()
-	path := fmt.Sprintf("/v1/account/%s/key/%s", account.ID, id)
-	err = m.Get(path, Defaults(), &pub_key)
 	if err != nil {
+		log.Printf("[REQUEST-ERROR] get-public-key was failed: %s", err)
 		return
 	}
-	pub_key.manager = m
+	path := fmt.Sprintf("/v1/account/%s/key/%s", account.ID, id)
+
+	if err = m.Get(path, Defaults(), &publicKey); err != nil {
+		log.Printf("[REQUEST-ERROR] get-public-key was failed: %s", err)
+	} else {
+		publicKey.manager = m
+	}
+
 	return
 }

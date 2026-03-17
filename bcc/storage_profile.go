@@ -1,6 +1,7 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -15,29 +16,34 @@ type StorageProfile struct {
 }
 
 func (v *Vdc) GetStorageProfiles(extraArgs ...Arguments) (storageProfiles []*StorageProfile, err error) {
+	path := "v1/storage_profile"
 	args := Arguments{
 		"vdc": v.ID,
 	}
 	args.merge(extraArgs)
 
-	path := "v1/storage_profile"
-	err = v.manager.GetItems(path, args, &storageProfiles)
-	for i := range storageProfiles {
-		storageProfiles[i].manager = v.manager
+	if err = v.manager.GetItems(path, args, &storageProfiles); err != nil {
+		log.Printf("[REQUEST-ERROR] get-storageProfiles was failed: %s", err)
+	} else {
+		for i := range storageProfiles {
+			storageProfiles[i].manager = v.manager
+		}
 	}
+
 	return
 }
 
 func (v *Vdc) GetStorageProfile(id string) (storageProfile *StorageProfile, err error) {
+	path, _ := url.JoinPath("v1/storage_profile", id)
 	args := Arguments{
 		"vdc": v.ID,
 	}
 
-	path, _ := url.JoinPath("v1/storage_profile", id)
 	if err = v.manager.Get(path, args, &storageProfile); err != nil {
-		return nil, errors.Wrapf(err, "crash via getting StorageProfile-%s", id)
+		log.Printf("[REQUEST-ERROR] get-storageProfile was failed: %s", errors.WithStack(err))
 	} else {
 		storageProfile.manager = v.manager
-		return
 	}
+
+	return
 }

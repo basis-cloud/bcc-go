@@ -1,6 +1,7 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
 )
 
@@ -16,6 +17,7 @@ type Hypervisor struct {
 }
 
 func (p *Project) GetAvailableHypervisors(extraArgs ...Arguments) (hypervisors []*Hypervisor, err error) {
+	path, _ := url.JoinPath("v1/project", p.ID)
 	type tempType struct {
 		Client struct {
 			AllowedHypervisors []*Hypervisor `json:"allowed_hypervisors"`
@@ -26,12 +28,15 @@ func (p *Project) GetAvailableHypervisors(extraArgs ...Arguments) (hypervisors [
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path, _ := url.JoinPath("v1/project", p.ID)
-	err = p.manager.Get(path, args, &target)
-	hypervisors = target.Client.AllowedHypervisors
+	if err = p.manager.Get(path, args, &target); err != nil {
+		log.Printf("[REQUEST-ERROR] get-projects for hypervisor was failed: %s", err)
+	} else {
+		hypervisors = target.Client.AllowedHypervisors
 
-	for i := range hypervisors {
-		hypervisors[i].manager = p.manager
+		for i := range hypervisors {
+			hypervisors[i].manager = p.manager
+		}
 	}
+
 	return
 }

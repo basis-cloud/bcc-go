@@ -2,9 +2,8 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 type Vm struct {
@@ -39,24 +38,28 @@ func NewVm(name string, cpu int, ram float64, template *Template, metadata []*Vm
 }
 
 func (m *Manager) GetVms(extraArgs ...Arguments) (vms []*Vm, err error) {
+	path := "v1/vm"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/vm"
-	err = m.GetItems(path, args, &vms)
-	for i := range vms {
-		vms[i].manager = m
-		for x := range vms[i].Ports {
-			vms[i].Ports[x].manager = m
-		}
-		for x := range vms[i].Disks {
-			vms[i].Disks[x].manager = m
-		}
-		vms[i].Vdc.manager = m
-		if vms[i].Floating != nil {
-			vms[i].Floating.manager = m
+	if err = m.GetItems(path, args, &vms); err != nil {
+		log.Printf("[REQUEST-ERROR] get-vms was failed: %s", err)
+	} else {
+		for i := range vms {
+			vms[i].manager = m
+			for x := range vms[i].Ports {
+				vms[i].Ports[x].manager = m
+			}
+			for x := range vms[i].Disks {
+				vms[i].Disks[x].manager = m
+			}
+			vms[i].Vdc.manager = m
+			if vms[i].Floating != nil {
+				vms[i].Floating.manager = m
+			}
 		}
 	}
+
 	return
 }
 
@@ -71,43 +74,45 @@ func (v *Vdc) GetVms(extraArgs ...Arguments) (vms []*Vm, err error) {
 
 func (m *Manager) GetVm(id string) (vm *Vm, err error) {
 	path, _ := url.JoinPath("v1/vm", id)
-	err = m.Get(path, Defaults(), &vm)
-	if err != nil {
-		return
-	}
-	vm.manager = m
-	for x := range vm.Ports {
-		vm.Ports[x].manager = m
-	}
-	for x := range vm.Disks {
-		vm.Disks[x].manager = m
-	}
-	vm.Vdc.manager = m
-	if vm.Floating != nil {
-		vm.Floating.manager = m
+
+	if err = m.Get(path, Defaults(), &vm); err != nil {
+		log.Printf("[REQUEST-ERROR] get-vm was failed: %s", err)
+	} else {
+		vm.manager = m
+		for x := range vm.Ports {
+			vm.Ports[x].manager = m
+		}
+		for x := range vm.Disks {
+			vm.Disks[x].manager = m
+		}
+		vm.Vdc.manager = m
+		if vm.Floating != nil {
+			vm.Floating.manager = m
+		}
 	}
 
 	return
 }
 
-func (v *Vdc) CreateVm(vm *Vm) error {
-	type TempPortCreate struct {
+func (v *Vdc) CreateVm(vm *Vm) (err error) {
+	path := "v1/vm"
+	type idList struct {
 		ID string `json:"id"`
 	}
 
-	tempPorts := make([]*TempPortCreate, len(vm.Ports))
+	portList := make([]*idList, len(vm.Ports))
 	for idx := range vm.Ports {
-		tempPorts[idx] = &TempPortCreate{ID: vm.Ports[idx].ID}
+		portList[idx] = &idList{ID: vm.Ports[idx].ID}
 	}
 
-	type TempFields struct {
+	type metadata struct {
 		Field string `json:"field"`
 		Value string `json:"value"`
 	}
 
-	tempFields := make([]*TempFields, len(vm.Metadata))
+	metaDataList := make([]*metadata, len(vm.Metadata))
 	for idx := range vm.Metadata {
-		tempFields[idx] = &TempFields{Field: vm.Metadata[idx].Field.ID, Value: vm.Metadata[idx].Value}
+		metaDataList[idx] = &metadata{Field: vm.Metadata[idx].Field.ID, Value: vm.Metadata[idx].Value}
 	}
 
 	type TempDisk struct {
@@ -116,33 +121,37 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		StorageProfile string `json:"storage_profile"`
 	}
 
-	tempDisks := make([]*TempDisk, len(vm.Disks))
+	diskList := make([]*TempDisk, len(vm.Disks))
 	for idx := range vm.Disks {
-		tempDisks[idx] = &TempDisk{Name: vm.Disks[idx].Name, Size: vm.Disks[idx].Size, StorageProfile: vm.Disks[idx].StorageProfile.ID}
+		diskList[idx] = &TempDisk{
+			Name:           vm.Disks[idx].Name,
+			Size:           vm.Disks[idx].Size,
+			StorageProfile: vm.Disks[idx].StorageProfile.ID,
+		}
 	}
 
-	var _affGr []string
+	var affGrList []string
 	if vm.AffinityGroups != nil && len(vm.AffinityGroups) > 0 {
 		for _, group := range vm.AffinityGroups {
-			_affGr = append(_affGr, group.ID)
+			affGrList = append(affGrList, group.ID)
 		}
 	}
 
 	args := &struct {
-		Name           string            `json:"name"`
-		Cpu            int               `json:"cpu"`
-		Ram            float64           `json:"ram"`
-		Vdc            string            `json:"vdc"`
-		Template       string            `json:"template"`
-		HotAdd         bool              `json:"hotadd_feature"`
-		Ports          []*TempPortCreate `json:"ports"`
-		Metadata       []*TempFields     `json:"metadata"`
-		UserData       *string           `json:"user_data,omitempty"`
-		Disks          []*TempDisk       `json:"disks"`
-		Floating       *string           `json:"floating"`
-		Tags           []string          `json:"tags"`
-		Platform       *string           `json:"platform,omitempty"`
-		AffinityGroups []string          `json:"affinity_groups,omitempty"`
+		Name           string      `json:"name"`
+		Cpu            int         `json:"cpu"`
+		Ram            float64     `json:"ram"`
+		Vdc            string      `json:"vdc"`
+		Template       string      `json:"template"`
+		HotAdd         bool        `json:"hotadd_feature"`
+		Ports          []*idList   `json:"ports"`
+		Metadata       []*metadata `json:"metadata"`
+		UserData       *string     `json:"user_data,omitempty"`
+		Disks          []*TempDisk `json:"disks"`
+		Floating       *string     `json:"floating"`
+		Tags           []string    `json:"tags"`
+		Platform       *string     `json:"platform,omitempty"`
+		AffinityGroups []string    `json:"affinity_groups,omitempty"`
 	}{
 		Name:           vm.Name,
 		Cpu:            vm.Cpu,
@@ -150,14 +159,14 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		Vdc:            v.ID,
 		Template:       vm.Template.ID,
 		HotAdd:         vm.HotAdd,
-		Ports:          tempPorts,
-		Metadata:       tempFields,
+		Ports:          portList,
+		Metadata:       metaDataList,
 		UserData:       vm.UserData,
-		Disks:          tempDisks,
+		Disks:          diskList,
 		Floating:       nil,
 		Tags:           convertTagsToNames(vm.Tags),
 		Platform:       nil,
-		AffinityGroups: _affGr,
+		AffinityGroups: affGrList,
 	}
 
 	if vm.Floating != nil {
@@ -172,8 +181,8 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		args.Platform = &vm.Platform.ID
 	}
 
-	if err := v.manager.Request("POST", "v1/vm", args, &vm); err != nil {
-		return errors.Wrapf(err, "crash via creating vm")
+	if err = v.manager.Request("POST", path, args, &vm); err != nil {
+		log.Printf("[REQUEST-ERROR] create-vm was failed: %s", err)
 	} else {
 		vm.manager = v.manager
 		for idx := range vm.Ports {
@@ -187,10 +196,12 @@ func (v *Vdc) CreateVm(vm *Vm) error {
 		}
 	}
 
-	return nil
+	return
 }
 
-func (v *Vm) ConnectPort(port *Port, exsist bool) error {
+func (v *Vm) ConnectPort(port *Port, exsist bool) (err error) {
+	path := "v1/port"
+	method := "POST"
 	type TempPortCreate struct {
 		Vm          string   `json:"vm"`
 		Network     string   `json:"network"`
@@ -211,36 +222,35 @@ func (v *Vm) ConnectPort(port *Port, exsist bool) error {
 		Tags:        convertTagsToNames(port.Tags),
 	}
 
-	var err error
 	if exsist {
-		path, _ := url.JoinPath("v1/port", port.ID)
-		err = v.manager.Request("PUT", path, args, &port)
-
-	} else {
-		err = v.manager.Request("POST", "v1/port", args, &port)
+		path, _ = url.JoinPath("v1/port", port.ID)
+		method = "PUT"
 	}
 
-	if err == nil {
+	if err = v.manager.Request(method, path, args, &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: connect-port was failed: %s", err)
+	} else {
 		port.manager = v.manager
 	}
 
-	return err
+	return
 }
 
-func (v *Vm) DisconnectPort(port *Port) error {
+func (v *Vm) DisconnectPort(port *Port) (err error) {
 	path := fmt.Sprintf("v1/port/%s/disconnect", port.ID)
-	err := v.manager.Request("PATCH", path, nil, nil)
-	if err != nil {
-		return err
-	}
-	for i, vmPorts := range v.Ports {
-		if vmPorts == port {
-			v.Ports = append(v.Ports[:i], v.Ports[i+1:]...)
-			break
+
+	if err = v.manager.Request("PATCH", path, nil, nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: disconnect-port was failed: %s", err)
+	} else {
+		for i, vmPorts := range v.Ports {
+			if vmPorts == port {
+				v.Ports = append(v.Ports[:i], v.Ports[i+1:]...)
+				break
+			}
 		}
 	}
 
-	return nil
+	return
 }
 
 func (v *Vm) PowerOn() error {
@@ -248,39 +258,37 @@ func (v *Vm) PowerOn() error {
 }
 
 func (v *Vm) PowerOff() error {
-	if err := v.updateState("power_off"); err != nil {
-		return errors.Wrapf(err, "failed to power off vm")
-	}
-	return nil
+	return v.updateState("power_off")
 }
 
 func (v *Vm) Reboot() error {
 	return v.updateState("reboot")
 }
 
-func (v *Vm) Reload() error {
-	m := v.manager
+func (v *Vm) Reload() (err error) {
 	path, _ := url.JoinPath("v1/vm", v.ID)
-	if err := m.Get(path, Defaults(), &v); err != nil {
-		return errors.Wrapf(err, "failed to reload vm")
+	m := v.manager
+
+	if err = m.Get(path, Defaults(), &v); err != nil {
+		log.Printf("[REQUEST-ERROR] get-vm was failed: %s", err)
+	} else {
+		v.manager = m
+		for x := range v.Ports {
+			v.Ports[x].manager = m
+		}
+		for x := range v.Disks {
+			v.Disks[x].manager = m
+		}
+		v.Vdc.manager = m
+		if v.Floating != nil {
+			v.Floating.manager = m
+		}
 	}
 
-	v.manager = m
-	for x := range v.Ports {
-		v.Ports[x].manager = m
-	}
-	for x := range v.Disks {
-		v.Disks[x].manager = m
-	}
-	v.Vdc.manager = m
-	if v.Floating != nil {
-		v.Floating.manager = m
-	}
-
-	return nil
+	return
 }
 
-func (v *Vm) Update() error {
+func (v *Vm) Update() (err error) {
 	path, _ := url.JoinPath("v1/vm", v.ID)
 	affGr := make([]string, 0)
 
@@ -318,14 +326,14 @@ func (v *Vm) Update() error {
 		}
 	}
 
-	err := v.manager.Request("PUT", path, args, v)
-	if err != nil {
-		return err
+	if err = v.manager.Request("PUT", path, args, v); err != nil {
+		log.Printf("[REQUEST-ERROR] update-vm was failed: %s", err)
 	}
-	return nil
+
+	return
 }
 
-func (v *Vm) updateState(state string) error {
+func (v *Vm) updateState(state string) (err error) {
 	path := fmt.Sprintf("v1/vm/%s/state", v.ID)
 
 	args := &struct {
@@ -334,7 +342,11 @@ func (v *Vm) updateState(state string) error {
 		State: state,
 	}
 
-	return v.manager.Request("POST", path, args, v)
+	if err = v.manager.Request("POST", path, args, v); err != nil {
+		log.Printf("[REQUEST-ERROR] update-vm was failed: %s", err)
+	}
+
+	return
 }
 
 func (v *Vm) Delete() error {
@@ -344,9 +356,5 @@ func (v *Vm) Delete() error {
 
 func (v Vm) WaitLock() error {
 	path, _ := url.JoinPath("v1/vm", v.ID)
-	if err := loopWaitLock(v.manager, path); err != nil {
-		return errors.Wrapf(err, "crash via WaitLock for VM")
-	} else {
-		return nil
-	}
+	return loopWaitLock(v.manager, path)
 }
