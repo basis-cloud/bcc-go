@@ -85,15 +85,26 @@ func loopWaitLock(manager *Manager, path string) (err error) {
 		Locked bool `json:"locked"`
 	}
 
+	ctx, cancel := context.WithTimeout(manager.ctx, manager.RequestTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(manager.RequestInterval)
+	defer ticker.Stop()
+
 	for {
 		if err = manager.Get(path, Defaults(), &wait); err != nil {
 			return err
 		}
-		if !wait.Locked {
-			break
-		}
-		time.Sleep(time.Second)
-	}
 
-	return nil
+		if !wait.Locked {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			manager.log("[ERROR] crash via waitlock unlock for '%s' took more than %ds", path, manager.RequestTimeout.Seconds())
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }

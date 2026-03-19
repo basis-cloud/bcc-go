@@ -1,12 +1,12 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
-	"strconv"
 )
 
 type PaasInputDescription struct {
-	ID          int                    `json:"id"`
+	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Value       string                 `json:"value"`
@@ -17,7 +17,7 @@ type PaasInputDescription struct {
 
 type PaasTemplate struct {
 	manager      *Manager
-	ID           int      `json:"id"`
+	ID           string   `json:"id"`
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	DisplayName  string   `json:"display_name"`
@@ -47,78 +47,93 @@ type PaasService struct {
 	Locked          bool                   `json:"locked"`
 }
 
-func (m *Manager) CreatePaasLocation(vdcId string) error {
+func (m *Manager) CreatePaasLocation(vdcId string) (err error) {
+	path := "v1/paas"
 	args := struct {
 		Vdc string `json:"vdc"`
 	}{
 		Vdc: vdcId,
 	}
-	path := "v1/paas"
-	err := m.Request("POST", path, args, nil)
-	return err
+
+	if err = m.Request("POST", path, args, nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: creating paas location was failed: %s", err)
+	}
+
+	return
 }
 
-func (m *Manager) GetPaasTemplates(vdcId string, extraArgs ...Arguments) ([]*PaasTemplate, error) {
-	var templates []*PaasTemplate
+func (m *Manager) GetPaasTemplates(vdcId string, extraArgs ...Arguments) (templates []*PaasTemplate, err error) {
+	path := "v1/paas_template"
 	args := Arguments{"vdc_id": vdcId}
 	args.merge(extraArgs)
-	path := "v1/paas_template"
-	if err := m.GetItems(path, args, &templates); err != nil {
-		return nil, err
+
+	if err = m.GetItems(path, args, &templates); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-paas-templates was failed: %s", err)
+	} else {
+		for i := range templates {
+			templates[i].manager = m
+		}
 	}
-	for i := range templates {
-		templates[i].manager = m
-	}
-	return templates, nil
+
+	return
 }
 
-func (m *Manager) GetPaasTemplate(id int, vdcId string) (*PaasTemplate, error) {
-	var template *PaasTemplate
+func (m *Manager) GetPaasTemplate(id string, vdcId string) (template *PaasTemplate, err error) {
+	path, _ := url.JoinPath("v1/paas_template", id)
 	args := Arguments{"vdc_id": vdcId}
-	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(id))
-	if err := m.Get(path, args, &template); err != nil {
-		return nil, err
+
+	if err = m.Get(path, args, &template); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-paas-template was failed: %s", err)
+	} else {
+		template.manager = m
 	}
-	template.manager = m
-	return template, nil
+
+	return
 }
 
 func (p *PaasTemplate) GetPaasTemplateInputs(projectId string, extraArgs ...Arguments) ([]*PaasInputDescription, error) {
-	path, _ := url.JoinPath("v1/paas_template", strconv.Itoa(p.ID), "inputs")
+	path, _ := url.JoinPath("v1/paas_template", p.ID, "inputs")
 	response := struct {
 		Inputs []*PaasInputDescription `json:"inputs"`
 	}{}
 	args := Arguments{"project_id": projectId}
 	args.merge(extraArgs)
+
 	if err := p.manager.Request("GET", path, args, &response); err != nil {
-		return nil, err
+		log.Printf("[REQUEST-ERROR]: get-paas-template-inputs was failed: %s", err)
 	}
+
 	return response.Inputs, nil
 }
 
-func (m *Manager) GetPaasServices(args Arguments) ([]*PaasService, error) {
-	var services []*PaasService
+func (m *Manager) GetPaasServices(args Arguments) (services []*PaasService, err error) {
 	path := "v1/paas_service"
-	if err := m.GetItems(path, args, &services); err != nil {
-		return nil, err
+
+	if err = m.GetItems(path, args, &services); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-paas-services was failed: %s", err)
+	} else {
+		for i := range services {
+			services[i].manager = m
+		}
 	}
-	for i := range services {
-		services[i].manager = m
-	}
-	return services, nil
+
+	return
 }
 
-func (m *Manager) GetPaasService(id string) (*PaasService, error) {
-	var service *PaasService
+func (m *Manager) GetPaasService(id string) (service *PaasService, err error) {
 	path, _ := url.JoinPath("v1/paas_service", id)
+
 	if err := m.Get(path, Defaults(), &service); err != nil {
-		return nil, err
+		log.Printf("[REQUEST-ERROR]: get-paas-service was failed: %s", err)
+	} else {
+		service.manager = m
 	}
-	service.manager = m
-	return service, nil
+
+	return
 }
 
 func (m *Manager) CreatePaasService(p *PaasService) error {
+	path := "v1/paas_service"
 	args := struct {
 		Name          string                 `json:"name"`
 		Vdc           string                 `json:"vdc"`
@@ -130,25 +145,31 @@ func (m *Manager) CreatePaasService(p *PaasService) error {
 		PaasServiceID: p.PaasServiceID,
 		Inputs:        p.Inputs,
 	}
-	path := "v1/paas_service"
-	err := m.Request("POST", path, args, &p)
-	if err != nil {
-		return err
+
+	if err := m.Request("POST", path, args, &p); err != nil {
+		log.Printf("[REQUEST-ERROR]: creating paas service was failed: %s", err)
+	} else {
+		p.manager = m
 	}
-	p.manager = m
+
 	return nil
 }
 
-func (p *PaasService) Update() error {
-	args := struct {
-		Name          string                 `json:"name"`
-		Inputs        map[string]interface{} `json:"paas_service_inputs"`
-	}{
-		Name:          p.Name,
-		Inputs:        p.Inputs,
-	}
+func (p *PaasService) Update() (err error) {
 	path, _ := url.JoinPath("v1/paas_service", p.ID)
-	return p.manager.Request("PUT", path, args, p)
+	args := struct {
+		Name   string                 `json:"name"`
+		Inputs map[string]interface{} `json:"paas_service_inputs"`
+	}{
+		Name:   p.Name,
+		Inputs: p.Inputs,
+	}
+
+	if err = p.manager.Request("PUT", path, args, p); err != nil {
+		log.Printf("[REQUEST-ERROR]: updating paas service was failed: %s", err)
+	}
+
+	return
 }
 
 func (m *Manager) DeletePaasService(id string) error {

@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 )
 
@@ -20,23 +21,24 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerPool struct {
-	manager *Manager
-	ID      string `json:"id"`
-	Locked  bool   `json:"locked"`
-
+	ID                 string        `json:"id"`
 	Port               int           `json:"port"`
+	CookieName         *string       `json:"cookie_name,omitempty"`
 	Connlimit          int           `json:"connlimit"`
 	Members            []*PoolMember `json:"members"`
-	Method             string        `json:"method"`
-	Protocol           string        `json:"protocol"`
-	SessionPersistence *string       `json:"session_persistence"`
+	Method             string        `json:"method,omitempty"`
+	Protocol           string        `json:"protocol,omitempty"`
+	SessionPersistence string        `json:"session_persistence,omitempty"`
+
+	manager *Manager
+	Locked  bool `json:"locked"`
 }
 
 type PoolMember struct {
 	ID     string `json:"id"`
 	Port   int    `json:"port"`
 	Weight int    `json:"weight"`
-	Vm     *Vm    `json:"vm"`
+	Vm     *TmpVm `json:"vm"`
 }
 
 func NewLoadBalancer(name string, vdc *Vdc, port *Port, floating *Port) LoadBalancer {
@@ -52,23 +54,54 @@ func NewLoadBalancer(name string, vdc *Vdc, port *Port, floating *Port) LoadBala
 	return l
 }
 
+func NewLoadBalancerPool(
+	lb LoadBalancer, port int, connlimit int, members []*PoolMember,
+	method string, protocol string, sessionPersistence string, cookieName interface{}) LoadBalancerPool {
+
+	lbPool := LoadBalancerPool{
+		manager:            lb.manager,
+		Port:               port,
+		Connlimit:          connlimit,
+		Members:            members,
+		Method:             method,
+		Protocol:           protocol,
+		SessionPersistence: sessionPersistence,
+	}
+	if cookieName != nil {
+		cookieName := cookieName.(string)
+		lbPool.CookieName = &cookieName
+	}
+
+	return lbPool
+}
+
+func NewLoadBalancerPoolMember(port int, weight int, vm *TmpVm) PoolMember {
+	member := PoolMember{
+		Weight: weight,
+		Vm:     vm,
+		Port:   port,
+	}
+	return member
+}
+
 func (m *Manager) GetLoadBalancers(extraArgs ...Arguments) (lbaasList []*LoadBalancer, err error) {
+	path := "v1/lbaas"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/lbaas"
-	err = m.GetItems(path, args, &lbaasList)
-	if err != nil {
-		return
-	}
-	for i := range lbaasList {
-		lbaasList[i].manager = m
-		lbaasList[i].Port.manager = m
-		lbaasList[i].Vdc.manager = m
-		if lbaasList[i].Floating != nil {
-			lbaasList[i].Floating.manager = m
+	if err = m.GetItems(path, args, &lbaasList); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-lbaas was failed: %s", err)
+	} else {
+		for i := range lbaasList {
+			lbaasList[i].manager = m
+			lbaasList[i].Port.manager = m
+			lbaasList[i].Vdc.manager = m
+			if lbaasList[i].Floating != nil {
+				lbaasList[i].Floating.manager = m
+			}
 		}
 	}
+
 	return
 }
 
@@ -83,20 +116,23 @@ func (v *Vdc) GetLoadBalancers(extraArgs ...Arguments) (lbaasList []*LoadBalance
 
 func (m *Manager) GetLoadBalancer(id string) (lbaas *LoadBalancer, err error) {
 	path, _ := url.JoinPath("v1/lbaas", id)
-	err = m.Get(path, Defaults(), &lbaas)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &lbaas); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-lbaas was failed: %s", err)
+	} else {
+		lbaas.manager = m
+		lbaas.Port.manager = m
+		lbaas.Vdc.manager = m
+		if lbaas.Floating != nil {
+			lbaas.Floating.manager = m
+		}
 	}
-	lbaas.manager = m
-	lbaas.Port.manager = m
-	lbaas.Vdc.manager = m
-	if lbaas.Floating != nil {
-		lbaas.Floating.manager = m
-	}
+
 	return
 }
 
-func (lb *LoadBalancer) Create() error {
+func (lb *LoadBalancer) Create() (err error) {
+	path := "v1/lbaas"
 	type customPort struct {
 		ID                string     `json:"id"`
 		IpAddress         *string    `json:"ip_address,omitempty"`
@@ -134,14 +170,15 @@ func (lb *LoadBalancer) Create() error {
 			lbCreate.Floating = lb.Floating.IpAddress
 		}
 	}
-	if err := lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb); err != nil {
-		return err
+	if err = lb.manager.Request("POST", path, lbCreate, &lb); err != nil {
+		log.Printf("[REQUEST-ERROR] lbaas.create was failed: %s", err)
 	}
 
-	return nil
+	return
 }
 
-func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) error {
+func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) (err error) {
+	path := "v1/lbaas"
 	type customPort struct {
 		ID                string     `json:"id"`
 		IpAddress         *string    `json:"ip_address,omitempty"`
@@ -174,20 +211,21 @@ func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) error {
 	}
 
 	if lb.Floating != nil {
-		lbCreate.Floating = lb.Floating.IpAddress
+		lbCreate.Floating = &lb.Floating.ID
 	}
 
-	if err := lb.manager.Request("POST", "v1/lbaas", lbCreate, &lb); err != nil {
-		return err
+	if err = lb.manager.Request("POST", path, lbCreate, &lb); err != nil {
+		log.Printf("[REQUEST-ERROR] create-lbaas was failed: %s", err)
 	} else {
 		lb.manager = v.manager
 	}
 
-	return nil
+	return
 }
 
-func (lb *LoadBalancer) Update() error {
+func (lb *LoadBalancer) Update() (err error) {
 	path, _ := url.JoinPath("v1/lbaas", lb.ID)
+
 	args := &struct {
 		Name     string  `json:"name"`
 		Floating *string `json:"floating"`
@@ -206,15 +244,13 @@ func (lb *LoadBalancer) Update() error {
 			args.Floating = lb.Floating.IpAddress
 		}
 	}
-	if err := lb.manager.Request("PUT", path, args, lb); err != nil {
-		return err
+	if err = lb.manager.Request("PUT", path, args, lb); err != nil {
+		log.Printf("[REQUEST-ERROR] update-lbaas was failed: %s", err)
 	} else {
-		if err = lb.WaitLock(); err != nil {
-			return err
-		}
+		err = lb.WaitLock()
 	}
 
-	return nil
+	return
 }
 
 func (lb *LoadBalancer) Delete() error {
@@ -223,48 +259,32 @@ func (lb *LoadBalancer) Delete() error {
 
 }
 
-func NewLoadBalancerPool(lb LoadBalancer, port int, connlimit int, members []*PoolMember, method string, protocol string, session_persistence string) LoadBalancerPool {
-	lb_pool := LoadBalancerPool{
-		manager:            lb.manager,
-		Port:               port,
-		Connlimit:          connlimit,
-		Members:            members,
-		Method:             method,
-		Protocol:           protocol,
-		SessionPersistence: &session_persistence,
-	}
-
-	return lb_pool
-}
-
-func NewLoadBalancerPoolMember(port int, weight int, vm *Vm) PoolMember {
-	member := PoolMember{
-		Weight: weight,
-		Vm:     vm,
-		Port:   port,
-	}
-	return member
-}
-
 func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerPool, err error) {
+	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
 	args := Defaults()
 	args.merge(extraArgs)
-	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
-	err = lb.manager.GetSubItems(path, args, &pools)
-	return pools, err
+
+	if err = lb.manager.GetSubItems(path, args, &pools); err != nil {
+		log.Printf("[REQUEST-ERROR] get-lbaas-pools was failed: %s", err)
+	}
+
+	return
 }
 
 func (lb *LoadBalancer) GetLoadBalancerPool(id string) (lbaas_pool LoadBalancerPool, err error) {
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	err = lb.manager.Get(path, Defaults(), &lbaas_pool)
-	if err != nil {
-		return
+
+	if err = lb.manager.Get(path, Defaults(), &lbaas_pool); err != nil {
+		log.Printf("[REQUEST-ERROR] get-lbaas-pool was failed: %s", err)
+	} else {
+		lbaas_pool.manager = lb.manager
 	}
-	lbaas_pool.manager = lb.manager
+
 	return
 }
 
-func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) error {
+func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) (err error) {
+	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
 	type poolMember struct {
 		Port   int    `json:"port"`
 		Weight int    `json:"weight"`
@@ -283,31 +303,30 @@ func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		Method             string        `json:"method"`
-		Protocol           string        `json:"protocol"`
-		SessionPersistence *string       `json:"session_persistence"`
+		CookieName         *string       `json:"cookie_name,omitempty"`
+		Method             string        `json:"method,omitempty"`
+		Protocol           string        `json:"protocol,omitempty"`
+		SessionPersistence string        `json:"session_persistence,omitempty"`
 	}{
 		Port:               pool.Port,
 		Connlimit:          pool.Connlimit,
 		Members:            members,
 		Method:             pool.Method,
 		Protocol:           pool.Protocol,
-		SessionPersistence: nil,
+		SessionPersistence: pool.SessionPersistence,
+		CookieName:         pool.CookieName,
 	}
 
-	if pool.SessionPersistence != nil && *pool.SessionPersistence != "" {
-		args.SessionPersistence = pool.SessionPersistence
+	if err = lb.manager.Request("POST", path, args, &pool); err != nil {
+		log.Printf("[REQUEST-ERROR] create-lbaas-pool was failed: %s", err)
 	}
 
-	path := fmt.Sprintf("v1/lbaas/%s/pool", lb.ID)
-	if err := lb.manager.Request("POST", path, args, &pool); err != nil {
-		return err
-	}
-
-	return nil
+	return
 }
 
-func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
+func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) (err error) {
+	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, pool.ID)
+
 	type poolMember struct {
 		Port   int    `json:"port"`
 		Weight int    `json:"weight"`
@@ -317,9 +336,10 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
 		Port               int           `json:"port"`
 		Connlimit          int           `json:"connlimit"`
 		Members            []*poolMember `json:"members"`
-		Method             string        `json:"method"`
-		Protocol           string        `json:"protocol"`
-		SessionPersistence *string       `json:"session_persistence"`
+		Method             string        `json:"method,omitempty"`
+		Protocol           string        `json:"protocol,omitempty"`
+		CookieName         *string       `json:"cookie_name,omitempty"`
+		SessionPersistence string        `json:"session_persistence,omitempty"`
 	}
 
 	var members []*poolMember
@@ -337,14 +357,15 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) error {
 		Members:            members,
 		Method:             pool.Method,
 		Protocol:           pool.Protocol,
+		CookieName:         pool.CookieName,
 		SessionPersistence: pool.SessionPersistence,
 	}
-	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, pool.ID)
+
 	if err := lb.manager.Request("PUT", path, lbCreatePool, &pool); err != nil {
-		return err
+		log.Printf("[REQUEST-ERROR] update-lbaas-pool was failed: %s", err)
 	}
 
-	return nil
+	return
 }
 
 func (lb *LoadBalancer) DeletePools() error {
@@ -364,7 +385,7 @@ func (lb *LoadBalancer) DeletePools() error {
 
 func (lb *LoadBalancer) DeletePool(id string) error {
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	if err := lb.manager.Delete(path, Defaults(), Defaults()); err != nil {
+	if err := lb.manager.Delete(path, Defaults(), nil); err != nil {
 		return err
 	}
 
