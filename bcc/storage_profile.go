@@ -23,7 +23,7 @@ func (v *Vdc) GetStorageProfiles(extraArgs ...Arguments) (storageProfiles []*Sto
 	args.merge(extraArgs)
 
 	if err = v.manager.GetItems(path, args, &storageProfiles); err != nil {
-		log.Printf("[REQUEST-ERROR] get-storageProfiles was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-storageProfile list failed: %s", err)
 	} else {
 		for i := range storageProfiles {
 			storageProfiles[i].manager = v.manager
@@ -40,7 +40,7 @@ func (v *Vdc) GetStorageProfile(id string) (storageProfile *StorageProfile, err 
 	}
 
 	if err = v.manager.Get(path, args, &storageProfile); err != nil {
-		log.Printf("[REQUEST-ERROR] get-storageProfile was failed: %s", errors.WithStack(err))
+		log.Printf("[REQUEST-ERROR] get-storageProfile failed: %s", errors.WithStack(err))
 	} else {
 		storageProfile.manager = v.manager
 	}

@@ -43,7 +43,7 @@ func (m *Manager) GetDisks(extraArgs ...Arguments) (disks []*Disk, err error) {
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &disks); err != nil {
-		log.Printf("[REQUEST-ERROR] get-disks was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-disk list failed: %s", err)
 	} else {
 		for i := range disks {
 			disks[i].manager = m
@@ -66,7 +66,7 @@ func (m *Manager) GetDisk(id string) (disk *Disk, err error) {
 	path, _ := url.JoinPath("v1/disk", id)
 
 	if err = m.Get(path, Defaults(), &disk); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting disk with id='%s' was failed: %s]", id, err)
+		log.Printf("[REQUEST-ERROR]: getting disk with id='%s' failed: %s]", id, err)
 	} else {
 		disk.manager = m
 	}
@@ -98,7 +98,7 @@ func (v *Vdc) CreateDisk(disk *Disk) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &disk); err != nil {
-		log.Printf("[REQUEST-ERROR] disk create was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-disk failed: %s", err)
 	} else {
 		disk.manager = v.manager
 	}
@@ -116,7 +116,7 @@ func (v *Vm) AttachDisk(disk *Disk) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, nil); err != nil {
-		log.Printf("[REQUEST-ERROR] disk attach with id ='%s' was failed : %s", disk.ID, err)
+		log.Printf("[REQUEST-ERROR] attach-disk with id ='%s' failed : %s", disk.ID, err)
 	} else {
 		v.Disks = append(v.Disks, disk)
 	}
@@ -128,7 +128,7 @@ func (v *Vm) DetachDisk(disk *Disk) (err error) {
 	path := fmt.Sprintf("v1/disk/%s/detach", disk.ID)
 
 	if err = v.manager.Request("POST", path, nil, nil); err != nil {
-		log.Printf("[REQUEST-ERROR] disk detach with id='%s' was failed: %s", disk.ID, err)
+		log.Printf("[REQUEST-ERROR] detach-disk with id='%s' failed: %s", disk.ID, err)
 	} else {
 		for i, vmDisk := range v.Disks {
 			if vmDisk == disk {
@@ -145,7 +145,7 @@ func (d *Disk) UpdateStorageProfile(storageProfile StorageProfile) (err error) {
 	d.StorageProfile = &storageProfile
 
 	if err = d.Update(); err != nil {
-		log.Printf("[REQUEST-ERROR]: storage-profile update was failed %s", err)
+		log.Printf("[REQUEST-ERROR]: update-storageProfile failed %s", err)
 	}
 
 	return nil
@@ -167,7 +167,7 @@ func (d *Disk) Update() (err error) {
 	}
 
 	if err = d.manager.Request("PUT", path, args, d); err != nil {
-		log.Printf("[REQUEST-ERROR] disk update with id='%s' was failed: %s", d.ID, err)
+		log.Printf("[REQUEST-ERROR] update-disk with id='%s' failed: %s", d.ID, err)
 	}
 
 	return nil
@@ -182,7 +182,7 @@ func (d *Disk) Resize(size int) (err error) {
 	d.Size = size
 
 	if err = d.Update(); err != nil {
-		log.Printf("[REQUEST-ERROR] disk-resize with id='%s' was failed: %s", d.ID, err)
+		log.Printf("[REQUEST-ERROR] resize-disk with id='%s' failed: %s", d.ID, err)
 	}
 
 	return
@@ -192,7 +192,7 @@ func (d *Disk) Delete() (err error) {
 	path, _ := url.JoinPath("v1/disk", d.ID)
 
 	if err = d.manager.Delete(path, Defaults(), nil); err != nil {
-		log.Printf("[REQUEST-ERROR] disk-delete with id='%s' was failed: %s", d.ID, err)
+		log.Printf("[REQUEST-ERROR] delete-disk with id='%s' failed: %s", d.ID, err)
 	}
 
 	return

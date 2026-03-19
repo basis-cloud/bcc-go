@@ -27,7 +27,7 @@ func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*A
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &affinityGroups); err != nil {
-		log.Printf("[REQUEST-ERROR] get-affinityGroups was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-affinityGroup list failed: %s", err)
 	} else {
 		for i := range affinityGroups {
 			affinityGroups[i].manager = m
@@ -51,7 +51,7 @@ func (m *Manager) GetAffinityGroup(id string) (affinityGroup *AffinityGroup, err
 	path, _ := url.JoinPath("v1/affinity_group", id)
 
 	if err = m.Get(path, Defaults(), &affinityGroup); err != nil {
-		log.Printf("[REQUEST-ERROR] get-affinityGroup was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-affinityGroup failed: %s", err)
 	} else {
 		affinityGroup.Vdc.manager = m
 	}
@@ -76,7 +76,7 @@ func (v *Vdc) CreateAffinityGroup(affinityGroup *AffinityGroup) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &affinityGroup); err != nil {
-		log.Printf("[REQUEST-ERROR] create-affinityGroup was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-affinityGroup failed: %s", err)
 	} else {
 		affinityGroup.manager = v.manager
 		affinityGroup.Vdc = v
@@ -90,7 +90,7 @@ func (a *AffinityGroup) Reload() (err error) {
 	m := a.manager
 
 	if err := m.Get(path, Defaults(), &a); err != nil {
-		log.Printf("[REQUEST-ERROR] reload-affinityGroup was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] reload-affinityGroup failed: %s", err)
 	} else {
 		a.manager = m
 		a.Vdc.manager = m
@@ -99,7 +99,7 @@ func (a *AffinityGroup) Reload() (err error) {
 	return
 }
 
-func (a *AffinityGroup) Update() error {
+func (a *AffinityGroup) Update() (err error) {
 	path, _ := url.JoinPath("v1/affinity_group", a.ID)
 	args := &struct {
 		Name        string   `json:"name"`
@@ -113,16 +113,19 @@ func (a *AffinityGroup) Update() error {
 		Vms:         convertNameToId(a.Vms),
 	}
 
-	if err := a.manager.Request("PUT", path, args, a); err != nil {
-		return err
+	if err = a.manager.Request("PUT", path, args, a); err != nil {
+		log.Printf("[REQUEST-ERROR] update-affinityGroup failed: %s", err)
 	}
 
-	return nil
+	return
 }
 
-func (a *AffinityGroup) Delete() error {
+func (a *AffinityGroup) Delete() (err error) {
 	path, _ := url.JoinPath("v1/affinity_group", a.ID)
-	return a.manager.Delete(path, Defaults(), nil)
+	if err = a.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-affinityGroup failed: %s", err)
+	}
+	return
 }
 
 func (a *AffinityGroup) WaitLock() error {

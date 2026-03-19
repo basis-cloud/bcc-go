@@ -27,7 +27,7 @@ func (m *Manager) GetProjects(extraArgs ...Arguments) (projects []*Project, err 
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &projects); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-projects was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-project list failed: %s", err)
 	} else {
 		for i := range projects {
 			projects[i].manager = m
@@ -41,7 +41,7 @@ func (m *Manager) GetProject(id string) (project *Project, err error) {
 	path, _ := url.JoinPath("v1/project", id)
 
 	if err = m.Get(path, Defaults(), &project); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting project-%s was failed: %s]", id, err)
+		log.Printf("[REQUEST-ERROR]: get project with id='%s' failed: %s", id, err)
 	} else {
 		project.manager = m
 	}
@@ -61,8 +61,8 @@ func (c *Client) CreateProject(project *Project) (err error) {
 		Tags:   convertTagsToNames(project.Tags),
 	}
 
-	if err := c.manager.Request("POST", path, args, &project); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating project-%s was failed: %s", project.Name, err)
+	if err = c.manager.Request("POST", path, args, &project); err != nil {
+		log.Printf("[REQUEST-ERROR]: create project failed: %s", err)
 	} else {
 		project.manager = c.manager
 	}
@@ -88,15 +88,18 @@ func (p *Project) Update() (err error) {
 	}
 
 	if err = p.manager.Request("PUT", path, args, p); err != nil {
-		log.Printf("[REQUEST-ERROR]: updating project-%s was failed: %s", p.Name, err)
+		log.Printf("[REQUEST-ERROR]: update-project failed: %s", err)
 	}
 
 	return
 }
 
-func (p *Project) Delete() error {
+func (p *Project) Delete() (err error) {
 	path, _ := url.JoinPath("v1/project", p.ID)
-	return p.manager.Delete(path, Defaults(), nil)
+	if err = p.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-project failed: %s", err)
+	}
+	return
 }
 
 func (p Project) WaitLock() (err error) {

@@ -24,7 +24,7 @@ func (r *Router) GetRoute(id string) (route *Route, err error) {
 	path, _ := url.JoinPath("v1/router", r.ID, "route", id)
 
 	if err = r.manager.Get(path, Defaults(), &route); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-route was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-route failed: %s", err)
 	} else {
 		route.router = r
 	}
@@ -43,7 +43,7 @@ func (r *Router) CreateRoute(route *Route) (err error) {
 	}
 
 	if err = r.manager.Request(http.MethodPost, path, args, &route); err != nil {
-		log.Printf("[REQUEST-ERROR]: create-route was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: create-route failed: %s", err)
 	} else {
 		route.router = r
 	}
@@ -62,15 +62,18 @@ func (route *Route) Update() (err error) {
 	}
 
 	if err = route.router.manager.Request(http.MethodPut, path, args, &route); err != nil {
-		log.Printf("[REQUEST-ERROR]: update-route was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: update-route failed: %s", err)
 	}
 
 	return
 }
 
-func (route *Route) Delete() error {
+func (route *Route) Delete() (err error) {
 	path, _ := url.JoinPath("v1/router", route.router.ID, "route", route.ID)
-	return route.router.manager.Delete(path, Defaults(), nil)
+	if err = route.router.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-route failed: %s", err)
+	}
+	return
 }
 
 func (route Route) WaitLock() (err error) {

@@ -31,7 +31,7 @@ func (m *Manager) GetDnsRecords(dnsId string, extraArgs ...Arguments) (dnsRecord
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &dnsRecord); err != nil {
-		log.Printf("[REQUEST-ERROR] get-dnsRecord's for dns with id='%s' was failed: %s", dnsId, err)
+		log.Printf("[REQUEST-ERROR] get-dnsRecord list for dns with id='%s' failed: %s", dnsId, err)
 	} else {
 		for i := range dnsRecord {
 			dnsRecord[i].manager = m
@@ -85,7 +85,7 @@ func (d *Dns) CreateDnsRecord(dnsRecord *DnsRecord) (err error) {
 	}
 
 	if err = d.manager.Request("POST", path, args, &dnsRecord); err != nil {
-		log.Printf("[REQUEST-ERROR] create-dnsRecord's was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-dnsRecord failed: %s", err)
 	} else {
 		dnsRecord.manager = d.manager
 		dnsRecord.DnsZone = d.ID
@@ -98,7 +98,7 @@ func (d *Dns) GetDnsRecord(id string) (dnsRecord *DnsRecord, err error) {
 	path := fmt.Sprintf("v1/dns/%s/record/%s", d.ID, id)
 
 	if err = d.manager.Get(path, Defaults(), &dnsRecord); err != nil {
-		log.Printf("[REQUEST-ERROR] get-dnsRecord with id='%s' was failed: %s", id, err)
+		log.Printf("[REQUEST-ERROR] get-dnsRecord with id='%s' failed: %s", id, err)
 	} else {
 		dnsRecord.manager = d.manager
 		dnsRecord.DnsZone = d.ID
@@ -143,13 +143,17 @@ func (d *DnsRecord) Update() (err error) {
 	}
 
 	if err = d.manager.Request("PUT", path, args, d); err != nil {
-		log.Printf("[REQUEST-ERROR] update-dnsRecord's was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-dnsRecord failed: %s", err)
 	}
 
 	return
 }
 
-func (d *DnsRecord) Delete() error {
+func (d *DnsRecord) Delete() (err error) {
 	path := fmt.Sprintf("v1/dns/%s/record/%s", d.DnsZone, d.ID)
-	return d.manager.Delete(path, Defaults(), nil)
+	if err = d.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-dnsRecord failed: %s", err)
+	}
+
+	return
 }

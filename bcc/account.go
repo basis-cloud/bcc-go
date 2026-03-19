@@ -13,7 +13,7 @@ func (m *Manager) GetAccount() (account *Account, err error) {
 	path := "v1/account/me"
 
 	if err = m.Get(path, Defaults(), &account); err != nil {
-		log.Printf("[REQUEST-ERROR] get-account was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-account failed: %s", err)
 	} else {
 		account.manager = m
 	}

@@ -36,7 +36,7 @@ func (m *Manager) GetVdcs(extraArgs ...Arguments) (vdcs []*Vdc, err error) {
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &vdcs); err != nil {
-		log.Printf("[REQUEST-ERROR] get-vdcs was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-vdc list failed: %s", err)
 	} else {
 		for i := range vdcs {
 			vdcs[i].manager = m
@@ -59,7 +59,7 @@ func (m *Manager) GetVdc(id string) (vdc *Vdc, err error) {
 	path, _ := url.JoinPath("v1/vdc", id)
 
 	if err = m.Get(path, Defaults(), &vdc); err != nil {
-		log.Printf("[REQUEST-ERROR] get-vdc with id='%s' was failed: %s", id, err)
+		log.Printf("[REQUEST-ERROR] get-vdc with id='%s' failed: %s", id, err)
 	} else {
 		vdc.manager = m
 	}
@@ -82,7 +82,7 @@ func (p *Project) CreateVdc(vdc *Vdc) (err error) {
 	}
 
 	if err = p.manager.Request("POST", path, args, &vdc); err != nil {
-		log.Printf("[REQUEST-ERROR] create-vdc was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-vdc failed: %s", err)
 	} else {
 		vdc.manager = p.manager
 	}
@@ -106,7 +106,7 @@ func (v *Vdc) Update() (err error) {
 	}
 
 	if err = v.manager.Request("PUT", path, args, v); err != nil {
-		log.Printf("[REQUEST-ERROR] update-vdc was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-vdc failed: %s", err)
 	}
 
 	return
@@ -116,7 +116,7 @@ func (v *Vdc) Delete() (err error) {
 	path, _ := url.JoinPath("v1/vdc", v.ID)
 
 	if err = v.manager.Delete(path, Defaults(), nil); err != nil {
-		log.Printf("[REQUEST-ERROR] delete-vdc was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] delete-vdc failed: %s", err)
 	}
 
 	return

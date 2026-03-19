@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 type Port struct {
@@ -40,7 +38,7 @@ func (v *Vdc) GetPorts(extraArgs ...Arguments) (ports []*Port, err error) {
 	args.merge(extraArgs)
 
 	if err = v.manager.GetItems(path, args, &ports); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-ports was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-port list failed: %s", err)
 	} else {
 		for i := range ports {
 			ports[i].manager = v.manager
@@ -55,7 +53,7 @@ func (m *Manager) GetPort(id string) (port *Port, err error) {
 	path, _ := url.JoinPath("v1/port", id)
 
 	if err = m.Get(path, Defaults(), &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting port-%s was failed: %s]", id, errors.WithStack(err))
+		log.Printf("[REQUEST-ERROR]: get-port with id='%s' failed: %s", id, err)
 	} else {
 		port.manager = m
 	}
@@ -100,7 +98,7 @@ func (r *Router) CreatePort(port *Port, toConnect interface{}) (err error) {
 	}
 
 	if err = r.manager.Request("POST", path, args, &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating port-%s was failed: %s", port.ID, err)
+		log.Printf("[REQUEST-ERROR]: create-port with id='%s' failed: %s", port.ID, err)
 	}
 
 	return
@@ -137,7 +135,7 @@ func (v *Vdc) CreateEmptyPort(port *Port) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating port-%s was failed: %s", port.ID, err)
+		log.Printf("[REQUEST-ERROR]: create-port failed: %s", err)
 	} else {
 		port.manager = v.manager
 	}
@@ -174,20 +172,26 @@ func (p *Port) Update() (err error) {
 	}
 
 	if err = p.manager.Request("PUT", path, args, p); err != nil {
-		log.Printf("[REQUEST-ERROR]: updating port-%s was failed: %s", p.ID, err)
+		log.Printf("[REQUEST-ERROR]: update-port with id='%s' failed: %s", p.ID, err)
 	}
 
 	return
 }
 
-func (p *Port) Delete() error {
+func (p *Port) Delete() (err error) {
 	path, _ := url.JoinPath("v1/port", p.ID)
-	return p.manager.Delete(path, Defaults(), nil)
+	if err = p.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: delete-port with id='%s' failed: %s", p.ID, err)
+	}
+	return
 }
 
-func (p *Port) ForceDelete() error {
+func (p *Port) ForceDelete() (err error) {
 	path := fmt.Sprintf("v1/port/%s/force", p.ID)
-	return p.manager.Delete(path, Defaults(), nil)
+	if err = p.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: force delete-port with id='%s' failed: %s", p.ID, err)
+	}
+	return
 }
 
 func (p Port) WaitLock() (err error) {

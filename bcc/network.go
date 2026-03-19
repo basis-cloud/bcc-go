@@ -35,7 +35,7 @@ func (m *Manager) GetNetworks(extraArgs ...Arguments) (networks []*Network, err 
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &networks); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting networks was failed: %s]", err)
+		log.Printf("[REQUEST-ERROR]: get-Network list failed: %s]", err)
 	} else {
 		for i := range networks {
 			networks[i].manager = m
@@ -58,7 +58,7 @@ func (m *Manager) GetNetwork(id string) (network *Network, err error) {
 	path := fmt.Sprintf("v1/network/%s", id)
 
 	if err = m.Get(path, Defaults(), &network); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting network-%s was failed: %s]", id, err)
+		log.Printf("[REQUEST-ERROR]: get-network with id='%s' failed: %s", id, err)
 	} else {
 		network.manager = m
 		for i := range network.Subnets {
@@ -85,7 +85,7 @@ func (v *Vdc) CreateNetwork(network *Network) error {
 	}
 
 	if err := v.manager.Request("POST", path, args, &network); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating network-%s was failed: %s", network.Name, err)
+		log.Printf("[REQUEST-ERROR]: create-network failed: %s", err)
 	} else {
 		network.manager = v.manager
 	}
@@ -98,7 +98,7 @@ func (n *Network) GetSubnets(extraArgs ...Arguments) (subnets []*Subnet, err err
 	args.merge(extraArgs)
 	path := fmt.Sprintf("v1/network/%s/subnet", n.ID)
 	if err = n.manager.GetItems(path, args, &subnets); err != nil {
-		return subnets, errors.Wrapf(err, "crash via getting subnets for network-%s", n.ID)
+		return subnets, errors.Wrapf(err, "[REQUEST-ERROR]: get-Subnets with network id='%s' failed: %s", n.ID, err)
 	}
 	for i := range subnets {
 		subnets[i].manager = n.manager
@@ -112,7 +112,7 @@ func (n *Network) CreateSubnet(subnet *Subnet) (err error) {
 	path := fmt.Sprintf("v1/network/%s/subnet", n.ID)
 
 	if err = n.manager.Request("POST", path, subnet, &subnet); err != nil {
-		return errors.Wrapf(err, "crash via creating subnet for network-%s", n.ID)
+		return errors.Wrapf(err, "[REQUEST-ERROR]: create-Subnet failed: %s", err)
 	} else {
 		subnet.manager = n.manager
 		subnet.network = n
@@ -138,23 +138,23 @@ func (n *Network) Update() (err error) {
 		Tags: convertTagsToNames(n.Tags),
 	}
 
-	if err := n.manager.Request("PUT", path, args, n); err != nil {
-		log.Printf("[REQUEST-ERROR]: updating network-%s was failed: %s", n.Name, err)
+	if err = n.manager.Request("PUT", path, args, n); err != nil {
+		log.Printf("[REQUEST-ERROR]: update-network failed: %s", err)
 	}
 
 	return
 }
 
-func (n *Network) Delete() error {
+func (n *Network) Delete() (err error) {
 	path, _ := url.JoinPath("v1/network", n.ID)
-	return n.manager.Delete(path, Defaults(), nil)
+	if err = n.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: delete-network failed: %s", err)
+	}
+
+	return
 }
 
 func (n Network) WaitLock() error {
 	path, _ := url.JoinPath("v1/network", n.ID)
-	if err := loopWaitLock(n.manager, path); err != nil {
-		return errors.Wrapf(err, "crash via WaitLock for Network")
-	} else {
-		return nil
-	}
+	return loopWaitLock(n.manager, path)
 }

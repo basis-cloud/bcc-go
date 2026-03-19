@@ -17,7 +17,7 @@ func (m *Manager) GetPublicKeys(accountId string) (publicKeys []*PubKey, err err
 	path := fmt.Sprintf("/v1/account/%s/key", accountId)
 
 	if err = m.GetItems(path, Defaults(), &publicKeys); err != nil {
-		log.Printf("[REQUEST-ERROR] get-public-keys was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-publicKey list failed: %s", err)
 	} else {
 		for i := range publicKeys {
 			publicKeys[i].manager = m
@@ -35,13 +35,13 @@ func (a *Account) GetPublicKeys() (publicKeys []*PubKey, err error) {
 func (m *Manager) GetPublicKey(id string) (publicKey *PubKey, err error) {
 	account, err := m.GetAccount()
 	if err != nil {
-		log.Printf("[REQUEST-ERROR] get-public-key was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-Account for publicKey failed: %s", err)
 		return
 	}
 	path := fmt.Sprintf("/v1/account/%s/key/%s", account.ID, id)
 
 	if err = m.Get(path, Defaults(), &publicKey); err != nil {
-		log.Printf("[REQUEST-ERROR] get-public-key was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-publicKey failed: %s", err)
 	} else {
 		publicKey.manager = m
 	}

@@ -56,7 +56,7 @@ func (m *Manager) CreatePaasLocation(vdcId string) (err error) {
 	}
 
 	if err = m.Request("POST", path, args, nil); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating paas location was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: create-paasLocation failed: %s", err)
 	}
 
 	return
@@ -68,7 +68,7 @@ func (m *Manager) GetPaasTemplates(vdcId string, extraArgs ...Arguments) (templa
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &templates); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-paas-templates was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-paasTemplate failed: %s", err)
 	} else {
 		for i := range templates {
 			templates[i].manager = m
@@ -83,7 +83,7 @@ func (m *Manager) GetPaasTemplate(id string, vdcId string) (template *PaasTempla
 	args := Arguments{"vdc_id": vdcId}
 
 	if err = m.Get(path, args, &template); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-paas-template was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-paasTemplate failed: %s", err)
 	} else {
 		template.manager = m
 	}
@@ -100,7 +100,7 @@ func (p *PaasTemplate) GetPaasTemplateInputs(projectId string, extraArgs ...Argu
 	args.merge(extraArgs)
 
 	if err := p.manager.Request("GET", path, args, &response); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-paas-template-inputs was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-paas-template-inputs failed: %s", err)
 	}
 
 	return response.Inputs, nil
@@ -110,7 +110,7 @@ func (m *Manager) GetPaasServices(args Arguments) (services []*PaasService, err 
 	path := "v1/paas_service"
 
 	if err = m.GetItems(path, args, &services); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-paas-services was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-paas-servic list failed: %s", err)
 	} else {
 		for i := range services {
 			services[i].manager = m
@@ -124,7 +124,7 @@ func (m *Manager) GetPaasService(id string) (service *PaasService, err error) {
 	path, _ := url.JoinPath("v1/paas_service", id)
 
 	if err := m.Get(path, Defaults(), &service); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-paas-service was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-paas-service failed: %s", err)
 	} else {
 		service.manager = m
 	}
@@ -147,7 +147,7 @@ func (m *Manager) CreatePaasService(p *PaasService) error {
 	}
 
 	if err := m.Request("POST", path, args, &p); err != nil {
-		log.Printf("[REQUEST-ERROR]: creating paas service was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: create-paasService failed: %s", err)
 	} else {
 		p.manager = m
 	}
@@ -166,15 +166,18 @@ func (p *PaasService) Update() (err error) {
 	}
 
 	if err = p.manager.Request("PUT", path, args, p); err != nil {
-		log.Printf("[REQUEST-ERROR]: updating paas service was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: update-paasService failed: %s", err)
 	}
 
 	return
 }
 
-func (m *Manager) DeletePaasService(id string) error {
+func (m *Manager) DeletePaasService(id string) (err error) {
 	path, _ := url.JoinPath("v1/paas_service", id)
-	return m.Delete(path, Defaults(), nil)
+	if err = m.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: delete-paasService failed: %s", err)
+	}
+	return
 }
 
 func (p PaasService) WaitLock() (err error) {

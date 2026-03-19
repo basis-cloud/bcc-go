@@ -21,7 +21,7 @@ func (t *Template) GetFields() (fields []*TemplateField, err error) {
 	path := fmt.Sprintf("v1/template/%s/field", t.ID)
 
 	if err = t.manager.Get(path, Defaults(), &fields); err != nil {
-		log.Printf("[REQUEST-ERROR] get-template-fields was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-template-field list failed: %s", err)
 	} else {
 		for i := range fields {
 			fields[i].manager = t.manager

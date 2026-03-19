@@ -18,7 +18,7 @@ func (m *Manager) GetSshKeys() (sshKeys []*SshKey, err error) {
 	path := "v1/account/me/key"
 
 	if err = m.GetItems(path, Defaults(), &sshKeys); err != nil {
-		log.Printf("[REQUEST-ERROR] get-ssh-keys was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-ssh-key list failed: %s", err)
 	} else {
 		for i := range sshKeys {
 			sshKeys[i].manager = m
