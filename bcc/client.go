@@ -1,6 +1,7 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
 )
 
@@ -13,23 +14,29 @@ type Client struct {
 }
 
 func (m *Manager) GetClients(extraArgs ...Arguments) (clients []*Client, err error) {
+	path := "v1/client"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/client"
-	err = m.GetItems(path, args, &clients)
-	for i := range clients {
-		clients[i].manager = m
+	if err = m.GetItems(path, args, &clients); err != nil {
+		log.Printf("[REQUEST-ERROR] get-clients was failed: %s", err)
+	} else {
+		for i := range clients {
+			clients[i].manager = m
+		}
 	}
+
 	return
 }
 
 func (m *Manager) GetClient(id string) (client *Client, err error) {
 	path, _ := url.JoinPath("v1/client", id)
-	err = m.Get(path, Defaults(), &client)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &client); err != nil {
+		log.Printf("[REQUEST-ERROR] get-client with id='%s' was failed: %s", id, err)
+	} else {
+		client.manager = m
 	}
-	client.manager = m
+
 	return
 }

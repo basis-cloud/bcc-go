@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 )
 
 type FirewallRule struct {
@@ -30,6 +31,7 @@ func NewFirewallRule(name string, destinationIp string, direction string, protoc
 }
 
 func (f *FirewallTemplate) CreateFirewallRule(firewallRule *FirewallRule) (err error) {
+	path := fmt.Sprintf("v1/firewall/%s/rule", f.ID)
 	args := &struct {
 		manager         *Manager
 		ID              string `json:"id"`
@@ -54,46 +56,59 @@ func (f *FirewallTemplate) CreateFirewallRule(firewallRule *FirewallRule) (err e
 		args.DstPortRangeMin = firewallRule.DstPortRangeMin
 	}
 
-	path := fmt.Sprintf("v1/firewall/%s/rule", f.ID)
-	err = f.manager.Request("POST", path, args, &firewallRule)
-	if err != nil {
-		return err
+	if err = f.manager.Request("POST", path, args, &firewallRule); err != nil {
+		log.Printf("[REQUEST-ERROR] create-FirewallRule was failed: %s", err)
+	} else {
+		firewallRule.manager = f.manager
+		firewallRule.TemplateId = f.ID
 	}
-	firewallRule.manager = f.manager
-	firewallRule.TemplateId = f.ID
+
 	return
 }
 
 func (f *FirewallTemplate) GetRuleById(firewallRuleId string) (firewallRule *FirewallRule, err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.ID, firewallRuleId)
-	err = f.manager.Get(path, Defaults(), &firewallRule)
-	if err != nil {
-		return
+
+	if err = f.manager.Get(path, Defaults(), &firewallRule); err != nil {
+		log.Printf("[REQUEST-ERROR] get-Firewall rule was failed: %s", err)
+	} else {
+		firewallRule.manager = f.manager
+		firewallRule.TemplateId = f.ID
 	}
-	firewallRule.manager = f.manager
-	firewallRule.TemplateId = f.ID
+
 	return
 }
 
 func (m *Manager) GetFirewallRules(id string, extraArgs ...Arguments) (firewallRules []*FirewallRule, err error) {
+	path := fmt.Sprintf("v1/firewall/%s/rule", id)
 	args := Defaults()
 	args.merge(extraArgs)
-	path := fmt.Sprintf("v1/firewall/%s/rule", id)
-	err = m.Get(path, args, &firewallRules)
-	if err != nil {
-		return
+
+	if err = m.Get(path, args, &firewallRules); err != nil {
+		log.Printf("[REQUEST-ERROR] get-Firewall rules was failed: %s", err)
 	}
+
 	return
 }
 
 func (f *FirewallRule) Update() (err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.TemplateId, f.ID)
-	return f.manager.Request("PUT", path, f, &f)
+
+	if err = f.manager.Request("PUT", path, f, &f); err != nil {
+		log.Printf("[REQUEST-ERROR] update-FirewallRule was failed: %s", err)
+	}
+
+	return
 }
 
 func (f *FirewallRule) Delete() (err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.TemplateId, f.ID)
-	return f.manager.Delete(path, Defaults(), nil)
+
+	if err = f.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-FirewallRule was failed: %s", err)
+	}
+
+	return
 }
 
 func (f FirewallRule) WaitLock() (err error) {

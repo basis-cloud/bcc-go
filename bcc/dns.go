@@ -1,6 +1,7 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
 )
 
@@ -18,14 +19,18 @@ func NewDns(name string) Dns {
 }
 
 func (m *Manager) GetDnss(extraArgs ...Arguments) (dnss []*Dns, err error) {
+	path := "v1/dns"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/dns"
-	err = m.GetItems(path, args, &dnss)
-	for i := range dnss {
-		dnss[i].manager = m
+	if err = m.GetItems(path, args, &dnss); err != nil {
+		log.Printf("[REQUEST-ERROR] get-dns's was failed: %s", err)
+	} else {
+		for i := range dnss {
+			dnss[i].manager = m
+		}
 	}
+
 	return
 }
 
@@ -41,15 +46,18 @@ func (p *Project) GetDnss(extraArgs ...Arguments) (dns []*Dns, err error) {
 
 func (m *Manager) GetDns(id string) (dns *Dns, err error) {
 	path, _ := url.JoinPath("v1/dns", id)
-	err = m.Get(path, Defaults(), &dns)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &dns); err != nil {
+		log.Printf("[REQUEST-ERROR] get-dns with id='%s' was failed: %s", id, err)
+	} else {
+		dns.manager = m
 	}
-	dns.manager = m
+
 	return
 }
 
 func (p *Project) CreateDns(dns *Dns) (err error) {
+	path := "v1/dns"
 	args := &struct {
 		manager *Manager
 		ID      string   `json:"id"`
@@ -63,8 +71,12 @@ func (p *Project) CreateDns(dns *Dns) (err error) {
 		Tags:    convertTagsToNames(dns.Tags),
 	}
 
-	err = p.manager.Request("POST", "v1/dns", args, &dns)
-	dns.manager = p.manager
+	if err = p.manager.Request("POST", path, args, &dns); err != nil {
+		log.Printf("[REQUEST-ERROR] create-dns failed: %s", err)
+	} else {
+		dns.manager = p.manager
+	}
+
 	return
 }
 
@@ -73,7 +85,7 @@ func (d *Dns) Delete() error {
 	return d.manager.Delete(path, Defaults(), nil)
 }
 
-func (d *Dns) Update() error {
+func (d *Dns) Update() (err error) {
 	path, _ := url.JoinPath("v1/dns", d.ID)
 
 	args := &struct {
@@ -87,8 +99,8 @@ func (d *Dns) Update() error {
 	}
 
 	if err := d.manager.Request("PUT", path, args, d); err != nil {
-		return err
+		log.Printf("[REQUEST-ERROR] update-dns failed: %s", err)
 	}
 
-	return nil
+	return
 }

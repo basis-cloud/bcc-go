@@ -1,6 +1,9 @@
 package bcc
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 type TemplateField struct {
 	manager     *Manager
@@ -17,9 +20,13 @@ type TemplateField struct {
 func (t *Template) GetFields() (fields []*TemplateField, err error) {
 	path := fmt.Sprintf("v1/template/%s/field", t.ID)
 
-	err = t.manager.Get(path, Defaults(), &fields)
-	for i := range fields {
-		fields[i].manager = t.manager
+	if err = t.manager.Get(path, Defaults(), &fields); err != nil {
+		log.Printf("[REQUEST-ERROR] get-template-fields was failed: %s", err)
+	} else {
+		for i := range fields {
+			fields[i].manager = t.manager
+		}
 	}
+
 	return
 }

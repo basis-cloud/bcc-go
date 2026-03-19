@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 )
 
 type RouterFirewallRule struct {
@@ -45,40 +46,50 @@ func NewRouterFirewallRule(
 
 func (r *Router) CreateFirewallRule(firewallRule *RouterFirewallRule) (err error) {
 	path := fmt.Sprintf("v1/router/%s/firewall_rule", r.ID)
-	err = r.manager.Request("POST", path, firewallRule, &firewallRule)
-	if err != nil {
-		return err
+
+	if err = r.manager.Request("POST", path, firewallRule, &firewallRule); err != nil {
+		log.Printf("[REQUEST-ERROR] create-FirewallRule was failed: %s", err)
+	} else {
+		firewallRule.manager = r.manager
+		firewallRule.routerId = r.ID
 	}
-	firewallRule.manager = r.manager
-	firewallRule.routerId = r.ID
+
 	return
 }
 
 func (r *Router) GetFirewallRuleById(firewallRuleId string) (firewallRule *RouterFirewallRule, err error) {
 	path := fmt.Sprintf("v1/router/%s/firewall_rule/%s", r.ID, firewallRuleId)
-	err = r.manager.Get(path, Defaults(), &firewallRule)
-	if err != nil {
-		return
+
+	if err = r.manager.Get(path, Defaults(), &firewallRule); err != nil {
+		log.Printf("[REQUEST-ERROR] get-Firewall rule was failed: %s", err)
+	} else {
+		firewallRule.manager = r.manager
+		firewallRule.routerId = r.ID
 	}
-	firewallRule.manager = r.manager
-	firewallRule.routerId = r.ID
+
 	return
 }
 
 func (r *Router) GetFirewallRules(extraArgs ...Arguments) (firewallRules []*RouterFirewallRule, err error) {
+	path := fmt.Sprintf("v1/router/%s/firewall_rule", r.ID)
 	args := Defaults()
 	args.merge(extraArgs)
-	path := fmt.Sprintf("v1/router/%s/firewall_rule", r.ID)
-	err = r.manager.Get(path, Defaults(), &firewallRules)
-	if err != nil {
-		return
+
+	if err = r.manager.Get(path, Defaults(), &firewallRules); err != nil {
+		log.Printf("[REQUEST-ERROR] get-Firewall rules was failed: %s", err)
 	}
+
 	return
 }
 
 func (f *RouterFirewallRule) Update() (err error) {
 	path := fmt.Sprintf("v1/router/%s/firewall_rule/%s", f.routerId, f.ID)
-	return f.manager.Request("PUT", path, f, &f)
+
+	if err = f.manager.Request("PUT", path, f, &f); err != nil {
+		log.Printf("[REQUEST-ERROR] update-FirewallRule was failed: %s", err)
+	}
+
+	return
 }
 
 func (f *RouterFirewallRule) Delete() (err error) {

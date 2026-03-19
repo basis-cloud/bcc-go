@@ -1,6 +1,7 @@
 package bcc
 
 import (
+	"log"
 	"net/url"
 )
 
@@ -14,25 +15,31 @@ type KubernetesTemplate struct {
 }
 
 func (v *Vdc) GetKubernetesTemplates(extraArgs ...Arguments) (templates []*KubernetesTemplate, err error) {
+	path := "/v1/kubernetes_template"
 	args := Arguments{
 		"vdc": v.ID,
 	}
 	args.merge(extraArgs)
 
-	path := "/v1/kubernetes_template"
-	err = v.manager.GetItems(path, args, &templates)
-	for i := range templates {
-		templates[i].manager = v.manager
+	if err = v.manager.GetItems(path, args, &templates); err != nil {
+		log.Printf("[REQUEST-ERROR] get-KubernetesTemplates failed: %s", err)
+	} else {
+		for i := range templates {
+			templates[i].manager = v.manager
+		}
 	}
+
 	return
 }
 
 func (m *Manager) GetKubernetesTemplate(id string) (template *KubernetesTemplate, err error) {
 	path, _ := url.JoinPath("v1/kubernetes_template", id)
-	err = m.Get(path, Defaults(), &template)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &template); err != nil {
+		log.Printf("[REQUEST-ERROR] get-KubernetesTemplate was failed: %s", err)
+	} else {
+		template.manager = m
 	}
-	template.manager = m
+
 	return
 }
