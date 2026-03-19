@@ -1,11 +1,8 @@
 package bcc
 
 import (
-	"fmt"
 	"log"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 type Vdc struct {
@@ -34,17 +31,18 @@ func NewVdc(name string, hypervisor *Hypervisor) Vdc {
 }
 
 func (m *Manager) GetVdcs(extraArgs ...Arguments) (vdcs []*Vdc, err error) {
+	path := "v1/vdc"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/vdc"
 	if err = m.GetItems(path, args, &vdcs); err != nil {
-		log.Printf("[REQUEST-ERROR]: %s]", errors.WithStack(err))
-		return nil, errors.Wrapf(err, "Get vdcs %s failed", path)
+		log.Printf("[REQUEST-ERROR] get-vdcs was failed: %s", err)
+	} else {
+		for i := range vdcs {
+			vdcs[i].manager = m
+		}
 	}
-	for i := range vdcs {
-		vdcs[i].manager = m
-	}
+
 	return
 }
 
@@ -59,16 +57,18 @@ func (v *Vdc) GetVdcs(extraArgs ...Arguments) (vdcs []*Vdc, err error) {
 
 func (m *Manager) GetVdc(id string) (vdc *Vdc, err error) {
 	path, _ := url.JoinPath("v1/vdc", id)
+
 	if err = m.Get(path, Defaults(), &vdc); err != nil {
-		log.Printf("[REQUEST-ERROR]: getting VDC-%s was failed: %s]", id, errors.WithStack(err))
-		return nil, err
+		log.Printf("[REQUEST-ERROR] get-vdc with id='%s' was failed: %s", id, err)
 	} else {
 		vdc.manager = m
 	}
+
 	return
 }
 
-func (p *Project) CreateVdc(vdc *Vdc) error {
+func (p *Project) CreateVdc(vdc *Vdc) (err error) {
+	path := "v1/vdc"
 	args := &struct {
 		Name       string   `json:"name"`
 		Hypervisor string   `json:"hypervisor"`
@@ -81,13 +81,13 @@ func (p *Project) CreateVdc(vdc *Vdc) error {
 		Tags:       convertTagsToNames(vdc.Tags),
 	}
 
-	if err := p.manager.Request("POST", "v1/vdc", args, &vdc); err != nil {
-		return err
+	if err = p.manager.Request("POST", path, args, &vdc); err != nil {
+		log.Printf("[REQUEST-ERROR] create-vdc was failed: %s", err)
 	} else {
 		vdc.manager = p.manager
 	}
 
-	return nil
+	return
 }
 
 func (v *Vdc) Rename(name string) error {
@@ -95,7 +95,8 @@ func (v *Vdc) Rename(name string) error {
 	return v.Update()
 }
 
-func (v *Vdc) Update() error {
+func (v *Vdc) Update() (err error) {
+	path, _ := url.JoinPath("v1/vdc", v.ID)
 	args := &struct {
 		Name string   `json:"name"`
 		Tags []string `json:"tags"`
@@ -103,25 +104,30 @@ func (v *Vdc) Update() error {
 		Name: v.Name,
 		Tags: convertTagsToNames(v.Tags),
 	}
-	path, _ := url.JoinPath("v1/vdc", v.ID)
-	return v.manager.Request("PUT", path, args, v)
+
+	if err = v.manager.Request("PUT", path, args, v); err != nil {
+		log.Printf("[REQUEST-ERROR] update-vdc was failed: %s", err)
+	}
+
+	return
 }
 
-func (v *Vdc) Delete() error {
+func (v *Vdc) Delete() (err error) {
 	path, _ := url.JoinPath("v1/vdc", v.ID)
-	if err := v.manager.Delete(path, Defaults(), nil); err != nil {
-		log.Printf("[REQUEST-ERROR]: %s]", errors.WithStack(err))
-		return fmt.Errorf("request for delete vdc %s was failed", v.ID)
+
+	if err = v.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-vdc was failed: %s", err)
 	}
-	return nil
+
+	return
 }
 
-func (v Vdc) WaitLock() error {
+func (v Vdc) WaitLock() (err error) {
 	path, _ := url.JoinPath("v1/vdc", v.ID)
-	if err := loopWaitLock(v.manager, path); err != nil {
-		log.Printf("[REQUEST-ERROR]: %s]", errors.WithStack(err))
-		return fmt.Errorf("request for WaitLock to VDC was failed")
-	} else {
-		return nil
+
+	if err = loopWaitLock(v.manager, path); err != nil {
+		log.Printf("[REQUEST-ERROR] wait-lock for vdc-%s was failed: %s", v.ID, err)
 	}
+
+	return
 }

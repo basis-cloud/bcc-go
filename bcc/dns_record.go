@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 )
 
 type DnsRecord struct {
@@ -24,27 +25,29 @@ func NewDnsRecord(data string, flag int, host string, port int, priority int, ta
 	return d
 }
 
-func (m *Manager) GetDnsRecords(dns_id string, extraArgs ...Arguments) (dns_records []*DnsRecord, err error) {
+func (m *Manager) GetDnsRecords(dnsId string, extraArgs ...Arguments) (dnsRecord []*DnsRecord, err error) {
+	path := fmt.Sprintf("v1/dns/%s/dns_record", dnsId)
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := fmt.Sprintf("v1/dns/%s/dns_record", dns_id)
-	err = m.GetItems(path, args, &dns_records)
-	for i := range dns_records {
-		dns_records[i].manager = m
+	if err = m.GetItems(path, args, &dnsRecord); err != nil {
+		log.Printf("[REQUEST-ERROR] get-dnsRecord's for dns with id='%s' was failed: %s", dnsId, err)
+	} else {
+		for i := range dnsRecord {
+			dnsRecord[i].manager = m
+		}
 	}
+
 	return
 }
 
-func (d *Dns) GetDnsRecords(extraArgs ...Arguments) (dns_record []*DnsRecord, err error) {
-	dns_record, err = d.manager.GetDnsRecords(d.ID, extraArgs...)
-	if err != nil {
-		return nil, err
-	}
-	return dns_record, nil
+func (d *Dns) GetDnsRecords(extraArgs ...Arguments) (dnsRecord []*DnsRecord, err error) {
+	dnsRecord, err = d.manager.GetDnsRecords(d.ID, extraArgs...)
+	return
 }
 
 func (d *Dns) CreateDnsRecord(dnsRecord *DnsRecord) (err error) {
+	path := fmt.Sprintf("v1/dns/%s/record", d.ID)
 	args := &struct {
 		manager  *Manager
 		ID       string  `json:"id"`
@@ -81,28 +84,31 @@ func (d *Dns) CreateDnsRecord(dnsRecord *DnsRecord) (err error) {
 		args.Port = &dnsRecord.Port
 	}
 
-	path := fmt.Sprintf("v1/dns/%s/record", d.ID)
-	err = d.manager.Request("POST", path, args, &dnsRecord)
-	if err != nil {
-		return err
+	if err = d.manager.Request("POST", path, args, &dnsRecord); err != nil {
+		log.Printf("[REQUEST-ERROR] create-dnsRecord's was failed: %s", err)
+	} else {
+		dnsRecord.manager = d.manager
+		dnsRecord.DnsZone = d.ID
 	}
-	dnsRecord.manager = d.manager
-	dnsRecord.DnsZone = d.ID
+
 	return
 }
 
-func (d *Dns) GetDnsRecord(id string) (dns_record *DnsRecord, err error) {
+func (d *Dns) GetDnsRecord(id string) (dnsRecord *DnsRecord, err error) {
 	path := fmt.Sprintf("v1/dns/%s/record/%s", d.ID, id)
-	err = d.manager.Get(path, Defaults(), &dns_record)
-	if err != nil {
-		return
+
+	if err = d.manager.Get(path, Defaults(), &dnsRecord); err != nil {
+		log.Printf("[REQUEST-ERROR] get-dnsRecord with id='%s' was failed: %s", id, err)
+	} else {
+		dnsRecord.manager = d.manager
+		dnsRecord.DnsZone = d.ID
 	}
-	dns_record.manager = d.manager
-	dns_record.DnsZone = d.ID
+
 	return
 }
 
-func (d *DnsRecord) Update() error {
+func (d *DnsRecord) Update() (err error) {
+	path := fmt.Sprintf("v1/dns/%s/record/%s", d.DnsZone, d.ID)
 	args := &struct {
 		Data     string  `json:"data"`
 		Flag     int     `json:"flag"`
@@ -136,12 +142,11 @@ func (d *DnsRecord) Update() error {
 		args.Port = &d.Port
 	}
 
-	path := fmt.Sprintf("v1/dns/%s/record/%s", d.DnsZone, d.ID)
-	err := d.manager.Request("PUT", path, args, d)
-	if err != nil {
-		return err
+	if err = d.manager.Request("PUT", path, args, d); err != nil {
+		log.Printf("[REQUEST-ERROR] update-dnsRecord's was failed: %s", err)
 	}
-	return nil
+
+	return
 }
 
 func (d *DnsRecord) Delete() error {

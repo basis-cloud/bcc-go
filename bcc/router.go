@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 type Router struct {
@@ -30,20 +28,24 @@ func NewRouter(name string, floating *string, vdc string) Router {
 }
 
 func (m *Manager) GetRouters(extraArgs ...Arguments) (routers []*Router, err error) {
+	path := "v1/router"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/router"
-	err = m.GetItems(path, args, &routers)
-	for i := range routers {
-		routers[i].manager = m
-		for x := range routers[i].Ports {
-			routers[i].Ports[x].manager = m
-		}
-		for x := range routers[i].Routes {
-			routers[i].Routes[x].router = routers[i]
+	if err = m.GetItems(path, args, &routers); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-routers was failed: %s", err)
+	} else {
+		for i := range routers {
+			routers[i].manager = m
+			for x := range routers[i].Ports {
+				routers[i].Ports[x].manager = m
+			}
+			for x := range routers[i].Routes {
+				routers[i].Routes[x].router = routers[i]
+			}
 		}
 	}
+
 	return
 }
 
@@ -58,21 +60,24 @@ func (v *Vdc) GetRouters(extraArgs ...Arguments) (routers []*Router, err error) 
 
 func (m *Manager) GetRouter(id string) (router *Router, err error) {
 	path, _ := url.JoinPath("v1/router", id)
-	err = m.Get(path, Defaults(), &router)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &router); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-router was failed: %s", err)
+	} else {
+		router.manager = m
+		for _, port := range router.Ports {
+			port.manager = m
+		}
+		for _, route := range router.Routes {
+			route.router = router
+		}
 	}
-	router.manager = m
-	for _, port := range router.Ports {
-		port.manager = m
-	}
-	for _, route := range router.Routes {
-		route.router = router
-	}
+
 	return
 }
 
-func (v *Vdc) CreateRouter(router *Router) error {
+func (v *Vdc) CreateRouter(router *Router) (err error) {
+	path := "v1/router"
 	type TempPortCreate struct {
 		ID string `json:"id"`
 	}
@@ -106,16 +111,18 @@ func (v *Vdc) CreateRouter(router *Router) error {
 		}
 	}
 
-	if err := v.manager.Request("POST", "v1/router", args, &router); err != nil {
-		return err
+	if err = v.manager.Request("POST", path, args, &router); err != nil {
+		log.Printf("[REQUEST-ERROR]: create-router was failed: %s", err)
 	} else {
 		router.manager = v.manager
 	}
 
-	return nil
+	return
 }
 
-func (r *Router) ConnectPort(port *Port, exsist bool) error {
+func (r *Router) ConnectPort(port *Port, exsist bool) (err error) {
+	path := "v1/port"
+	method := "POST"
 	type TempPortCreate struct {
 		Router      string   `json:"router"`
 		Network     string   `json:"network"`
@@ -134,36 +141,35 @@ func (r *Router) ConnectPort(port *Port, exsist bool) error {
 		FwTemplates: fwTemplates,
 	}
 
-	var err error
 	if exsist {
-		path, _ := url.JoinPath("v1/port", port.ID)
-		err = r.manager.Request("PUT", path, args, &port)
-
-	} else {
-		err = r.manager.Request("POST", "v1/port", args, &port)
+		method = "PUT"
+		path, _ = url.JoinPath("v1/port", port.ID)
 	}
 
-	if err == nil {
+	if err = r.manager.Request(method, path, args, &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: connect-port was failed: %s", err)
+	} else {
 		port.manager = r.manager
 	}
 
-	return err
+	return
 }
 
-func (r *Router) DisconnectPort(port *Port) error {
+func (r *Router) DisconnectPort(port *Port) (err error) {
 	path := fmt.Sprintf("v1/port/%s/disconnect", port.ID)
-	err := r.manager.Request("PATCH", path, Defaults(), &port)
-	if err != nil {
-		return err
-	}
-	for i, routerPorts := range r.Ports {
-		if routerPorts == port {
-			r.Ports = append(r.Ports[:i], r.Ports[i+1:]...)
-			break
+
+	if err := r.manager.Request("PATCH", path, Defaults(), &port); err != nil {
+		log.Printf("[REQUEST-ERROR]: disconnect-port was failed: %s", err)
+	} else {
+		for i, routerPorts := range r.Ports {
+			if routerPorts == port {
+				r.Ports = append(r.Ports[:i], r.Ports[i+1:]...)
+				break
+			}
 		}
 	}
 
-	return nil
+	return
 }
 
 func (r *Router) Delete() error {
@@ -176,7 +182,8 @@ func (r *Router) Rename(name string) error {
 	return r.manager.Request("PUT", path, Arguments{"name": name}, r.ID)
 }
 
-func (r *Router) Update() error {
+func (r *Router) Update() (err error) {
+	path, _ := url.JoinPath("v1/router", r.ID)
 	args := &struct {
 		ID        string   `json:"id"`
 		Name      string   `json:"name"`
@@ -200,20 +207,23 @@ func (r *Router) Update() error {
 	} else {
 		args.Floating = &r.Floating.ID
 	}
-	path, _ := url.JoinPath("v1/router", r.ID)
+
 	if err := r.WaitLock(); err != nil {
 		return err
 	}
 
-	return r.manager.Request("PUT", path, args, r)
+	if err = r.manager.Request("PUT", path, args, r); err != nil {
+		log.Printf("[REQUEST-ERROR]: update-router was failed: %s", err)
+	}
+
+	return
 }
 
-func (r Router) WaitLock() error {
+func (r Router) WaitLock() (err error) {
 	path, _ := url.JoinPath("v1/router", r.ID)
-	if err := loopWaitLock(r.manager, path); err != nil {
-		log.Printf("[REQUEST-ERROR]: %s]", errors.WithStack(err))
-		return fmt.Errorf("request for WaitLock to Router was failed")
-	} else {
-		return nil
+	if err = loopWaitLock(r.manager, path); err != nil {
+		log.Printf("[REQUEST-ERROR]: %s", err)
 	}
+
+	return
 }

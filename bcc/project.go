@@ -3,8 +3,6 @@ package bcc
 import (
 	"log"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 type Project struct {
@@ -24,29 +22,35 @@ func NewProject(name string) Project {
 }
 
 func (m *Manager) GetProjects(extraArgs ...Arguments) (projects []*Project, err error) {
+	path := "v1/project"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/project"
-	err = m.GetItems(path, args, &projects)
-	for i := range projects {
-		projects[i].manager = m
+	if err = m.GetItems(path, args, &projects); err != nil {
+		log.Printf("[REQUEST-ERROR]: get-projects was failed: %s", err)
+	} else {
+		for i := range projects {
+			projects[i].manager = m
+		}
 	}
+
 	return
 }
 
 func (m *Manager) GetProject(id string) (project *Project, err error) {
 	path, _ := url.JoinPath("v1/project", id)
-	err = m.Get(path, Defaults(), &project)
-	if err != nil {
-		log.Printf("[REQUEST-ERROR]: getting project-%s was failed: %s]", id, errors.WithStack(err))
-		return nil, err
+
+	if err = m.Get(path, Defaults(), &project); err != nil {
+		log.Printf("[REQUEST-ERROR]: getting project-%s was failed: %s]", id, err)
+	} else {
+		project.manager = m
 	}
-	project.manager = m
+
 	return
 }
 
-func (c *Client) CreateProject(project *Project) error {
+func (c *Client) CreateProject(project *Project) (err error) {
+	path := "v1/project"
 	args := &struct {
 		Name   string   `json:"name"`
 		Client string   `json:"client"`
@@ -57,12 +61,13 @@ func (c *Client) CreateProject(project *Project) error {
 		Tags:   convertTagsToNames(project.Tags),
 	}
 
-	err := c.manager.Request("POST", "v1/project", args, &project)
-	if err == nil {
+	if err := c.manager.Request("POST", path, args, &project); err != nil {
+		log.Printf("[REQUEST-ERROR]: creating project-%s was failed: %s", project.Name, err)
+	} else {
 		project.manager = c.manager
 	}
 
-	return err
+	return
 }
 
 func (p *Project) Rename(name string) error {
@@ -70,7 +75,8 @@ func (p *Project) Rename(name string) error {
 	return p.Update()
 }
 
-func (p *Project) Update() error {
+func (p *Project) Update() (err error) {
+	path, _ := url.JoinPath("v1/project", p.ID)
 	args := &struct {
 		Name   string   `json:"name"`
 		Client string   `json:"client"`
@@ -80,8 +86,12 @@ func (p *Project) Update() error {
 		Client: p.Client.Id,
 		Tags:   convertTagsToNames(p.Tags),
 	}
-	path, _ := url.JoinPath("v1/project", p.ID)
-	return p.manager.Request("PUT", path, args, p)
+
+	if err = p.manager.Request("PUT", path, args, p); err != nil {
+		log.Printf("[REQUEST-ERROR]: updating project-%s was failed: %s", p.Name, err)
+	}
+
+	return
 }
 
 func (p *Project) Delete() error {

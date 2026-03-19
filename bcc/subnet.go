@@ -2,8 +2,7 @@ package bcc
 
 import (
 	"fmt"
-
-	"github.com/pkg/errors"
+	"log"
 )
 
 type SubnetDNSServer struct {
@@ -51,17 +50,24 @@ func NewSubnetRoute(cidr string, gateway string, metric int) SubnetRoute {
 	return s
 }
 
-func (s *Subnet) Delete() error {
+func (s *Subnet) Delete() (err error) {
 	path := fmt.Sprintf("v1/network/%s/subnet/%s", s.network.ID, s.ID)
-	if err := s.manager.Delete(path, Defaults(), nil); err != nil {
-		return errors.Wrapf(err, "failed to delete subnet for network-%s", s.network.ID)
+
+	if err = s.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-subnet was failed: %s", err)
 	}
-	return nil
+
+	return
 }
 
-func (s *Subnet) update() error {
+func (s *Subnet) update() (err error) {
 	path := fmt.Sprintf("v1/network/%s/subnet/%s", s.network.ID, s.ID)
-	return s.manager.Request("PUT", path, s, s)
+
+	if err = s.manager.Request("PUT", path, s, s); err != nil {
+		log.Printf("[REQUEST-ERROR] update-subnet was failed: %s", err)
+	}
+
+	return
 }
 
 func (s *Subnet) EnableDHCP() error {
@@ -76,10 +82,7 @@ func (s *Subnet) DisableDHCP() error {
 
 func (s *Subnet) UpdateDNSServers(dnsServers []*SubnetDNSServer) error {
 	s.DnsServers = dnsServers
-	if err := s.update(); err != nil {
-		return errors.Wrap(err, "failed to update subnet dns servers")
-	}
-	return nil
+	return s.update()
 }
 
 func (s *Subnet) UpdateRoutes(routes []*SubnetRoute) error {

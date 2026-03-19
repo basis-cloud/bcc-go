@@ -2,6 +2,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 )
 
@@ -47,55 +48,70 @@ func NewKubernetes(name string, nodeCpu int, nodeRam int, nodesCount int, nodeDi
 	return k
 }
 
-func (m *Manager) ListKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err error) {
+func (m *Manager) ListKubernetes(extraArgs ...Arguments) (k8s []*Kubernetes, err error) {
+	path := "v1/kubernetes"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/kubernetes"
-	err = m.GetItems(path, args, &ks)
-	for i := range ks {
-		ks[i].manager = m
-		for x := range ks[i].Vms {
-			ks[i].Vms[x].manager = m
+	if err = m.GetItems(path, args, &k8s); err != nil {
+		log.Printf("[REQUEST-ERROR] list-kubernetes was failed: %s", err)
+	} else {
+		for i := range k8s {
+			k8s[i].manager = m
+			for x := range k8s[i].Vms {
+				k8s[i].Vms[x].manager = m
+			}
 		}
 	}
+
 	return
 }
 
 func (k *Kubernetes) GetKubernetesConfigUrl() (err error) {
-	var config *string
 	path := fmt.Sprintf("/v1/kubernetes/%s/config", k.ID)
-	err = k.manager.Get(path, Defaults(), &config)
+	var config *string
+
+	if err = k.manager.Get(path, Defaults(), &config); err != nil {
+		log.Printf("[REQUEST-ERROR] get-kubernetes-config was failed: %s", err)
+	}
+
 	return
 }
 
-func (k *Kubernetes) GetKubernetesDashBoardUrl() (dashboard_url *KubernetesDashBoardUrl, err error) {
+func (k *Kubernetes) GetKubernetesDashBoardUrl() (dashboardUrl *KubernetesDashBoardUrl, err error) {
 	path := fmt.Sprintf("/v1/kubernetes/%s/dashboard", k.ID)
-	err = k.manager.Get(path, Defaults(), &dashboard_url)
+
+	if err = k.manager.Get(path, Defaults(), &dashboardUrl); err != nil {
+		log.Printf("[REQUEST-ERROR] get-kubernetes-dashboard was failed: %s", err)
+	}
+
 	return
 }
 
 func (m *Manager) GetKubernetes(id string) (k8s *Kubernetes, err error) {
 	path, _ := url.JoinPath("/v1/kubernetes", id)
-	err = m.Get(path, Defaults(), &k8s)
-	if err != nil {
-		return
+
+	if err = m.Get(path, Defaults(), &k8s); err != nil {
+		log.Printf("[REQUEST-ERROR] get-kubernetes was failed: %s", err)
+	} else {
+		k8s.Vdc.manager = m
+		k8s.manager = m
 	}
-	k8s.Vdc.manager = m
-	k8s.manager = m
+
 	return
 }
 
-func (v *Vdc) GetKubernetes(extraArgs ...Arguments) (ks []*Kubernetes, err error) {
+func (v *Vdc) GetKubernetes(extraArgs ...Arguments) (k8s []*Kubernetes, err error) {
 	args := Arguments{
 		"vdc": v.ID,
 	}
 	args.merge(extraArgs)
-	ks, err = v.manager.ListKubernetes(args)
+	k8s, err = v.manager.ListKubernetes(args)
 	return
 }
 
-func (v *Vdc) CreateKubernetes(k *Kubernetes) error {
+func (v *Vdc) CreateKubernetes(k8s *Kubernetes) (err error) {
+	path := "/v1/kubernetes"
 	type TempPortCreate struct {
 		ID string `json:"id"`
 	}
@@ -114,41 +130,41 @@ func (v *Vdc) CreateKubernetes(k *Kubernetes) error {
 		NodePlatform       *string  `json:"node_platform,omitempty"`
 		Tags               []string `json:"tags"`
 	}{
-		Name:               k.Name,
-		NodeCpu:            k.NodeCpu,
-		NodeRam:            k.NodeRam,
-		NodeDiskSize:       k.NodeDiskSize,
-		NodesCount:         k.NodesCount,
-		NodeStorageProfile: &k.NodeStorageProfile.ID,
+		Name:               k8s.Name,
+		NodeCpu:            k8s.NodeCpu,
+		NodeRam:            k8s.NodeRam,
+		NodeDiskSize:       k8s.NodeDiskSize,
+		NodesCount:         k8s.NodesCount,
+		NodeStorageProfile: &k8s.NodeStorageProfile.ID,
 		Vdc:                &v.ID,
-		Template:           &k.Template.ID,
-		UserPublicKey:      k.UserPublicKey,
+		Template:           &k8s.Template.ID,
+		UserPublicKey:      k8s.UserPublicKey,
 		Floating:           nil,
 		NodePlatform:       nil,
-		Tags:               convertTagsToNames(k.Tags),
+		Tags:               convertTagsToNames(k8s.Tags),
 	}
 
-	if k.Floating != nil {
-		args.Floating = k.Floating.IpAddress
+	if k8s.Floating != nil {
+		args.Floating = k8s.Floating.IpAddress
 	}
 
-	if k.NodePlatform != nil {
-		args.NodePlatform = &k.NodePlatform.ID
+	if k8s.NodePlatform != nil {
+		args.NodePlatform = &k8s.NodePlatform.ID
 	}
 
-	if err := v.manager.Request("POST", "/v1/kubernetes", args, &k); err != nil {
-		return err
+	if err = v.manager.Request("POST", path, args, &k8s); err != nil {
+		log.Printf("[REQUEST-ERROR] create-kubernetes was failed: %s", err)
 	} else {
-		k.manager = v.manager
-		for idx := range k.Vms {
-			k.Vms[idx].manager = v.manager
+		k8s.manager = v.manager
+		for idx := range k8s.Vms {
+			k8s.Vms[idx].manager = v.manager
 		}
 	}
 
-	return nil
+	return
 }
 
-func (k *Kubernetes) Update() error {
+func (k *Kubernetes) Update() (err error) {
 	path, _ := url.JoinPath("/v1/kubernetes", k.ID)
 	args := &struct {
 		Name               string   `json:"name"`
@@ -179,11 +195,12 @@ func (k *Kubernetes) Update() error {
 			args.Floating = k.Floating.IpAddress
 		}
 	}
-	err := k.manager.Request("PUT", path, args, k)
-	if err != nil {
-		return err
+
+	if err = k.manager.Request("PUT", path, args, k); err != nil {
+		log.Printf("[REQUEST-ERROR] update-kubernetes was failed: %s", err)
 	}
-	return nil
+
+	return
 }
 
 func (k *Kubernetes) Delete() error {

@@ -1,6 +1,9 @@
 package bcc
 
-import "net/url"
+import (
+	"log"
+	"net/url"
+)
 
 type AffinityGroup struct {
 	manager     *Manager
@@ -8,7 +11,6 @@ type AffinityGroup struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Policy      string      `json:"policy"`
-	Reboot      bool        `json:"reboot,omitempty"`
 	Vms         []*MetaData `json:"vms,omitempty"`
 	Vdc         *Vdc        `json:"vdc"`
 	Locked      bool        `json:"locked,omitempty"`
@@ -16,20 +18,20 @@ type AffinityGroup struct {
 }
 
 func NewAffinityGroup(name string, description string, policy string, vms []*MetaData) AffinityGroup {
-	return AffinityGroup{Name: name, Description: description, Policy: policy, Vms: vms, Reboot: false}
+	return AffinityGroup{Name: name, Description: description, Policy: policy, Vms: vms}
 }
 
 func (m *Manager) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*AffinityGroup, err error) {
+	path := "v1/affinity_group"
 	args := Defaults()
 	args.merge(extraArgs)
 
-	path := "v1/affinity_group"
-	err = m.Get(path, args, &affinityGroups)
-
-	for i := range affinityGroups {
-		affinityGroups[i].manager = m
-		affinityGroups[i].Vdc.manager = m
-		affinityGroups[i].Reboot = false
+	if err = m.GetItems(path, args, &affinityGroups); err != nil {
+		log.Printf("[REQUEST-ERROR] get-affinityGroups was failed: %s", err)
+	} else {
+		for i := range affinityGroups {
+			affinityGroups[i].manager = m
+		}
 	}
 
 	return
@@ -40,79 +42,74 @@ func (v *Vdc) GetAffinityGroups(extraArgs ...Arguments) (affinityGroups []*Affin
 		"vdc": v.ID,
 	}
 	args.merge(extraArgs)
+
 	affinityGroups, err = v.manager.GetAffinityGroups(args)
 	return
 }
 
 func (m *Manager) GetAffinityGroup(id string) (affinityGroup *AffinityGroup, err error) {
 	path, _ := url.JoinPath("v1/affinity_group", id)
-	if err = m.Get(path, Defaults(), &affinityGroup); err != nil {
-		return
-	}
 
-	affinityGroup.manager = m
-	affinityGroup.Vdc.manager = m
-	affinityGroup.Reboot = false
+	if err = m.Get(path, Defaults(), &affinityGroup); err != nil {
+		log.Printf("[REQUEST-ERROR] get-affinityGroup was failed: %s", err)
+	} else {
+		affinityGroup.Vdc.manager = m
+	}
 
 	return
 }
 
-func (v *Vdc) CreateAffinityGroup(affinityGroup *AffinityGroup) error {
+func (v *Vdc) CreateAffinityGroup(affinityGroup *AffinityGroup) (err error) {
+	path := "v1/affinity_group"
 	args := &struct {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
 		Policy      string   `json:"policy"`
-		Reboot      bool     `json:"reboot"`
 		Vms         []string `json:"vms,omitempty"`
 		Vdc         string   `json:"vdc"`
 	}{
 		Name:        affinityGroup.Name,
 		Description: affinityGroup.Description,
 		Policy:      affinityGroup.Policy,
-		Reboot:      affinityGroup.Reboot,
 		Vms:         convertNameToId(affinityGroup.Vms),
 		Vdc:         v.ID,
 	}
 
-	if err := v.manager.Request("POST", "v1/affinity_group", args, &affinityGroup); err != nil {
-		return err
+	if err = v.manager.Request("POST", path, args, &affinityGroup); err != nil {
+		log.Printf("[REQUEST-ERROR] create-affinityGroup was failed: %s", err)
 	} else {
 		affinityGroup.manager = v.manager
 		affinityGroup.Vdc = v
 	}
 
-	return nil
+	return
 }
 
-func (a *AffinityGroup) Reload() error {
+func (a *AffinityGroup) Reload() (err error) {
+	path, _ := url.JoinPath("v1/affinity_group", a.ID)
 	m := a.manager
 
-	path, _ := url.JoinPath("v1/affinity_group", a.ID)
 	if err := m.Get(path, Defaults(), &a); err != nil {
-		return err
+		log.Printf("[REQUEST-ERROR] reload-affinityGroup was failed: %s", err)
+	} else {
+		a.manager = m
+		a.Vdc.manager = m
 	}
 
-	a.manager = m
-	a.Vdc.manager = m
-	a.Reboot = false
-
-	return nil
+	return
 }
 
 func (a *AffinityGroup) Update() error {
 	path, _ := url.JoinPath("v1/affinity_group", a.ID)
-
 	args := &struct {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
 		Policy      string   `json:"policy"`
-		Reboot      bool     `json:"reboot"`
 		Vms         []string `json:"vms,omitempty"`
 	}{
 		Name:        a.Name,
 		Description: a.Description,
 		Policy:      a.Policy,
-		Reboot:      a.Reboot,
 		Vms:         convertNameToId(a.Vms),
 	}
 
