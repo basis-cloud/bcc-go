@@ -29,7 +29,7 @@ func (p *Project) GetAvailableHypervisors(extraArgs ...Arguments) (hypervisors [
 	args.merge(extraArgs)
 
 	if err = p.manager.Get(path, args, &target); err != nil {
-		log.Printf("[REQUEST-ERROR] get-projects for hypervisor was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-projects for hypervisor failed: %s", err)
 	} else {
 		hypervisors = target.Client.AllowedHypervisors
 

@@ -54,7 +54,7 @@ func (s *Subnet) Delete() (err error) {
 	path := fmt.Sprintf("v1/network/%s/subnet/%s", s.network.ID, s.ID)
 
 	if err = s.manager.Delete(path, Defaults(), nil); err != nil {
-		log.Printf("[REQUEST-ERROR] delete-subnet was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] delete-subnet failed: %s", err)
 	}
 
 	return
@@ -64,7 +64,7 @@ func (s *Subnet) update() (err error) {
 	path := fmt.Sprintf("v1/network/%s/subnet/%s", s.network.ID, s.ID)
 
 	if err = s.manager.Request("PUT", path, s, s); err != nil {
-		log.Printf("[REQUEST-ERROR] update-subnet was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-subnet failed: %s", err)
 	}
 
 	return

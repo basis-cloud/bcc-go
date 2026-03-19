@@ -24,7 +24,7 @@ func (m *Manager) GetDnss(extraArgs ...Arguments) (dnss []*Dns, err error) {
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &dnss); err != nil {
-		log.Printf("[REQUEST-ERROR] get-dns's was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-dns list failed: %s", err)
 	} else {
 		for i := range dnss {
 			dnss[i].manager = m
@@ -48,7 +48,7 @@ func (m *Manager) GetDns(id string) (dns *Dns, err error) {
 	path, _ := url.JoinPath("v1/dns", id)
 
 	if err = m.Get(path, Defaults(), &dns); err != nil {
-		log.Printf("[REQUEST-ERROR] get-dns with id='%s' was failed: %s", id, err)
+		log.Printf("[REQUEST-ERROR] get-dns with id='%s' failed: %s", id, err)
 	} else {
 		dns.manager = m
 	}
@@ -80,9 +80,13 @@ func (p *Project) CreateDns(dns *Dns) (err error) {
 	return
 }
 
-func (d *Dns) Delete() error {
+func (d *Dns) Delete() (err error) {
 	path, _ := url.JoinPath("v1/dns", d.ID)
-	return d.manager.Delete(path, Defaults(), nil)
+	if err = d.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-dns failed: %s", err)
+	}
+
+	return
 }
 
 func (d *Dns) Update() (err error) {
@@ -98,7 +102,7 @@ func (d *Dns) Update() (err error) {
 		Tags:    convertTagsToNames(d.Tags),
 	}
 
-	if err := d.manager.Request("PUT", path, args, d); err != nil {
+	if err = d.manager.Request("PUT", path, args, d); err != nil {
 		log.Printf("[REQUEST-ERROR] update-dns failed: %s", err)
 	}
 

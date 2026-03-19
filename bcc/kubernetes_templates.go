@@ -36,7 +36,7 @@ func (m *Manager) GetKubernetesTemplate(id string) (template *KubernetesTemplate
 	path, _ := url.JoinPath("v1/kubernetes_template", id)
 
 	if err = m.Get(path, Defaults(), &template); err != nil {
-		log.Printf("[REQUEST-ERROR] get-KubernetesTemplate was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-KubernetesTemplate failed: %s", err)
 	} else {
 		template.manager = m
 	}

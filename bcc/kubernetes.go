@@ -54,7 +54,7 @@ func (m *Manager) ListKubernetes(extraArgs ...Arguments) (k8s []*Kubernetes, err
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &k8s); err != nil {
-		log.Printf("[REQUEST-ERROR] list-kubernetes was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-kubernetes list failed: %s", err)
 	} else {
 		for i := range k8s {
 			k8s[i].manager = m
@@ -72,7 +72,7 @@ func (k *Kubernetes) GetKubernetesConfigUrl() (err error) {
 	var config *string
 
 	if err = k.manager.Get(path, Defaults(), &config); err != nil {
-		log.Printf("[REQUEST-ERROR] get-kubernetes-config was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-kubernetes-config failed: %s", err)
 	}
 
 	return
@@ -82,7 +82,7 @@ func (k *Kubernetes) GetKubernetesDashBoardUrl() (dashboardUrl *KubernetesDashBo
 	path := fmt.Sprintf("/v1/kubernetes/%s/dashboard", k.ID)
 
 	if err = k.manager.Get(path, Defaults(), &dashboardUrl); err != nil {
-		log.Printf("[REQUEST-ERROR] get-kubernetes-dashboard was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-kubernetes-dashboard failed: %s", err)
 	}
 
 	return
@@ -92,7 +92,7 @@ func (m *Manager) GetKubernetes(id string) (k8s *Kubernetes, err error) {
 	path, _ := url.JoinPath("/v1/kubernetes", id)
 
 	if err = m.Get(path, Defaults(), &k8s); err != nil {
-		log.Printf("[REQUEST-ERROR] get-kubernetes was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-kubernetes failed: %s", err)
 	} else {
 		k8s.Vdc.manager = m
 		k8s.manager = m
@@ -153,7 +153,7 @@ func (v *Vdc) CreateKubernetes(k8s *Kubernetes) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &k8s); err != nil {
-		log.Printf("[REQUEST-ERROR] create-kubernetes was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-kubernetes failed: %s", err)
 	} else {
 		k8s.manager = v.manager
 		for idx := range k8s.Vms {
@@ -197,15 +197,19 @@ func (k *Kubernetes) Update() (err error) {
 	}
 
 	if err = k.manager.Request("PUT", path, args, k); err != nil {
-		log.Printf("[REQUEST-ERROR] update-kubernetes was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-kubernetes failed: %s", err)
 	}
 
 	return
 }
 
-func (k *Kubernetes) Delete() error {
+func (k *Kubernetes) Delete() (err error) {
 	path, _ := url.JoinPath("v1/kubernetes", k.ID)
-	return k.manager.Delete(path, Defaults(), nil)
+	if err = k.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-kubernetes failed: %s", err)
+	}
+
+	return
 }
 
 func (k Kubernetes) WaitLock() error {

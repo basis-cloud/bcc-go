@@ -43,7 +43,7 @@ func (m *Manager) GetVms(extraArgs ...Arguments) (vms []*Vm, err error) {
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &vms); err != nil {
-		log.Printf("[REQUEST-ERROR] get-vms was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-vm list failed: %s", err)
 	} else {
 		for i := range vms {
 			vms[i].manager = m
@@ -76,7 +76,7 @@ func (m *Manager) GetVm(id string) (vm *Vm, err error) {
 	path, _ := url.JoinPath("v1/vm", id)
 
 	if err = m.Get(path, Defaults(), &vm); err != nil {
-		log.Printf("[REQUEST-ERROR] get-vm was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-vm failed: %s", err)
 	} else {
 		vm.manager = m
 		for x := range vm.Ports {
@@ -182,7 +182,7 @@ func (v *Vdc) CreateVm(vm *Vm) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &vm); err != nil {
-		log.Printf("[REQUEST-ERROR] create-vm was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-vm failed: %s", err)
 	} else {
 		vm.manager = v.manager
 		for idx := range vm.Ports {
@@ -228,7 +228,7 @@ func (v *Vm) ConnectPort(port *Port, exsist bool) (err error) {
 	}
 
 	if err = v.manager.Request(method, path, args, &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: connect-port was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: connect-port failed: %s", err)
 	} else {
 		port.manager = v.manager
 	}
@@ -240,7 +240,7 @@ func (v *Vm) DisconnectPort(port *Port) (err error) {
 	path := fmt.Sprintf("v1/port/%s/disconnect", port.ID)
 
 	if err = v.manager.Request("PATCH", path, nil, nil); err != nil {
-		log.Printf("[REQUEST-ERROR]: disconnect-port was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: disconnect-port failed: %s", err)
 	} else {
 		for i, vmPorts := range v.Ports {
 			if vmPorts == port {
@@ -270,7 +270,7 @@ func (v *Vm) Reload() (err error) {
 	m := v.manager
 
 	if err = m.Get(path, Defaults(), &v); err != nil {
-		log.Printf("[REQUEST-ERROR] get-vm was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-vm failed: %s", err)
 	} else {
 		v.manager = m
 		for x := range v.Ports {
@@ -327,7 +327,7 @@ func (v *Vm) Update() (err error) {
 	}
 
 	if err = v.manager.Request("PUT", path, args, v); err != nil {
-		log.Printf("[REQUEST-ERROR] update-vm was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-vm failed: %s", err)
 	}
 
 	return
@@ -349,9 +349,12 @@ func (v *Vm) updateState(state string) (err error) {
 	return
 }
 
-func (v *Vm) Delete() error {
+func (v *Vm) Delete() (err error) {
 	path, _ := url.JoinPath("v1/vm", v.ID)
-	return v.manager.Delete(path, Defaults(), nil)
+	if err = v.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-vm failed: %s", err)
+	}
+	return
 }
 
 func (v Vm) WaitLock() error {

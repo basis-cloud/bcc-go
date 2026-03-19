@@ -33,7 +33,7 @@ func (m *Manager) GetRouters(extraArgs ...Arguments) (routers []*Router, err err
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &routers); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-routers was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-router list failed: %s", err)
 	} else {
 		for i := range routers {
 			routers[i].manager = m
@@ -62,7 +62,7 @@ func (m *Manager) GetRouter(id string) (router *Router, err error) {
 	path, _ := url.JoinPath("v1/router", id)
 
 	if err = m.Get(path, Defaults(), &router); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-router was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-router with id='%s' failed: %s", id, err)
 	} else {
 		router.manager = m
 		for _, port := range router.Ports {
@@ -112,7 +112,7 @@ func (v *Vdc) CreateRouter(router *Router) (err error) {
 	}
 
 	if err = v.manager.Request("POST", path, args, &router); err != nil {
-		log.Printf("[REQUEST-ERROR]: create-router was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: create-router failed: %s", err)
 	} else {
 		router.manager = v.manager
 	}
@@ -147,7 +147,7 @@ func (r *Router) ConnectPort(port *Port, exsist bool) (err error) {
 	}
 
 	if err = r.manager.Request(method, path, args, &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: connect-port was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: connect-port failed: %s", err)
 	} else {
 		port.manager = r.manager
 	}
@@ -159,7 +159,7 @@ func (r *Router) DisconnectPort(port *Port) (err error) {
 	path := fmt.Sprintf("v1/port/%s/disconnect", port.ID)
 
 	if err := r.manager.Request("PATCH", path, Defaults(), &port); err != nil {
-		log.Printf("[REQUEST-ERROR]: disconnect-port was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: disconnect-port failed: %s", err)
 	} else {
 		for i, routerPorts := range r.Ports {
 			if routerPorts == port {
@@ -172,9 +172,12 @@ func (r *Router) DisconnectPort(port *Port) (err error) {
 	return
 }
 
-func (r *Router) Delete() error {
+func (r *Router) Delete() (err error) {
 	path, _ := url.JoinPath("v1/router", r.ID)
-	return r.manager.Delete(path, Defaults(), nil)
+	if err = r.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR]: delete-router failed: %s", err)
+	}
+	return
 }
 
 func (r *Router) Rename(name string) error {
@@ -213,7 +216,7 @@ func (r *Router) Update() (err error) {
 	}
 
 	if err = r.manager.Request("PUT", path, args, r); err != nil {
-		log.Printf("[REQUEST-ERROR]: update-router was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: update-router failed: %s", err)
 	}
 
 	return
@@ -222,7 +225,7 @@ func (r *Router) Update() (err error) {
 func (r Router) WaitLock() (err error) {
 	path, _ := url.JoinPath("v1/router", r.ID)
 	if err = loopWaitLock(r.manager, path); err != nil {
-		log.Printf("[REQUEST-ERROR]: %s", err)
+		log.Printf("[REQUEST-ERROR]: waitlock-Router failed %s", err)
 	}
 
 	return

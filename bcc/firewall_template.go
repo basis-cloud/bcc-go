@@ -17,11 +17,16 @@ type FirewallTemplate struct {
 	Vdc         *Vdc   `json:"vdc,omitempty"`
 }
 
+func NewFirewallTemplate(name string) (firewallTemplate FirewallTemplate) {
+	d := FirewallTemplate{Name: name}
+	return d
+}
+
 func (m *Manager) GetFirewallTemplate(id string) (firewallTemplate *FirewallTemplate, err error) {
 	path, _ := url.JoinPath("v1/firewall/", id)
 
 	if err = m.Get(path, Defaults(), &firewallTemplate); err != nil {
-		log.Printf("[REQUEST-ERROR] get-FirewallTemplate with id='%s' was failed: %s", id, err)
+		log.Printf("[REQUEST-ERROR] get-FirewallTemplate with id='%s' failed: %s", id, err)
 	} else {
 		firewallTemplate.manager = m
 	}
@@ -35,7 +40,7 @@ func (v *Vdc) GetFirewallTemplates(extraArgs ...Arguments) (firewallTemplate []*
 	args.merge(extraArgs)
 
 	if err = v.manager.GetItems(path, args, &firewallTemplate); err != nil {
-		log.Printf("[REQUEST-ERROR] get-FirewallTemplates failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-FirewallTemplate list failed: %s", err)
 	} else {
 		for i, _ := range firewallTemplate {
 			firewallTemplate[i].manager = v.manager
@@ -43,11 +48,6 @@ func (v *Vdc) GetFirewallTemplates(extraArgs ...Arguments) (firewallTemplate []*
 	}
 
 	return
-}
-
-func NewFirewallTemplate(name string) (firewallTemplate FirewallTemplate) {
-	d := FirewallTemplate{Name: name}
-	return d
 }
 
 func (f *FirewallTemplate) Update(firewallRule *FirewallRule) (err error) {
@@ -62,9 +62,13 @@ func (f *FirewallTemplate) Update(firewallRule *FirewallRule) (err error) {
 	return
 }
 
-func (f *FirewallTemplate) Delete() error {
+func (f *FirewallTemplate) Delete() (err error) {
 	path, _ := url.JoinPath("v1/firewall", f.ID)
-	return f.manager.Delete(path, Defaults(), nil)
+	if err = f.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-FirewallTemplate failed: %s", err)
+	}
+
+	return
 }
 
 func (f *FirewallTemplate) Rename(name string) error {

@@ -48,7 +48,7 @@ func (r *Router) CreateFirewallRule(firewallRule *RouterFirewallRule) (err error
 	path := fmt.Sprintf("v1/router/%s/firewall_rule", r.ID)
 
 	if err = r.manager.Request("POST", path, firewallRule, &firewallRule); err != nil {
-		log.Printf("[REQUEST-ERROR] create-FirewallRule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-FirewallRule failed: %s", err)
 	} else {
 		firewallRule.manager = r.manager
 		firewallRule.routerId = r.ID
@@ -61,7 +61,7 @@ func (r *Router) GetFirewallRuleById(firewallRuleId string) (firewallRule *Route
 	path := fmt.Sprintf("v1/router/%s/firewall_rule/%s", r.ID, firewallRuleId)
 
 	if err = r.manager.Get(path, Defaults(), &firewallRule); err != nil {
-		log.Printf("[REQUEST-ERROR] get-Firewall rule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-Firewall rule failed: %s", err)
 	} else {
 		firewallRule.manager = r.manager
 		firewallRule.routerId = r.ID
@@ -76,7 +76,7 @@ func (r *Router) GetFirewallRules(extraArgs ...Arguments) (firewallRules []*Rout
 	args.merge(extraArgs)
 
 	if err = r.manager.Get(path, Defaults(), &firewallRules); err != nil {
-		log.Printf("[REQUEST-ERROR] get-Firewall rules was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-Firewall rule list failed: %s", err)
 	}
 
 	return
@@ -86,7 +86,7 @@ func (f *RouterFirewallRule) Update() (err error) {
 	path := fmt.Sprintf("v1/router/%s/firewall_rule/%s", f.routerId, f.ID)
 
 	if err = f.manager.Request("PUT", path, f, &f); err != nil {
-		log.Printf("[REQUEST-ERROR] update-FirewallRule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-FirewallRule failed: %s", err)
 	}
 
 	return
@@ -94,7 +94,10 @@ func (f *RouterFirewallRule) Update() (err error) {
 
 func (f *RouterFirewallRule) Delete() (err error) {
 	path := fmt.Sprintf("v1/router/%s/firewall_rule/%s", f.routerId, f.ID)
-	return f.manager.Delete(path, Defaults(), nil)
+	if err = f.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-FirewallRule failed: %s", err)
+	}
+	return
 }
 
 func (f RouterFirewallRule) WaitLock() (err error) {

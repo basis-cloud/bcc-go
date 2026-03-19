@@ -57,7 +57,7 @@ func (f *FirewallTemplate) CreateFirewallRule(firewallRule *FirewallRule) (err e
 	}
 
 	if err = f.manager.Request("POST", path, args, &firewallRule); err != nil {
-		log.Printf("[REQUEST-ERROR] create-FirewallRule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-FirewallRule failed: %s", err)
 	} else {
 		firewallRule.manager = f.manager
 		firewallRule.TemplateId = f.ID
@@ -70,7 +70,7 @@ func (f *FirewallTemplate) GetRuleById(firewallRuleId string) (firewallRule *Fir
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.ID, firewallRuleId)
 
 	if err = f.manager.Get(path, Defaults(), &firewallRule); err != nil {
-		log.Printf("[REQUEST-ERROR] get-Firewall rule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-Firewall rule failed: %s", err)
 	} else {
 		firewallRule.manager = f.manager
 		firewallRule.TemplateId = f.ID
@@ -85,7 +85,7 @@ func (m *Manager) GetFirewallRules(id string, extraArgs ...Arguments) (firewallR
 	args.merge(extraArgs)
 
 	if err = m.Get(path, args, &firewallRules); err != nil {
-		log.Printf("[REQUEST-ERROR] get-Firewall rules was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-Firewall rule list failed: %s", err)
 	}
 
 	return
@@ -95,7 +95,7 @@ func (f *FirewallRule) Update() (err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.TemplateId, f.ID)
 
 	if err = f.manager.Request("PUT", path, f, &f); err != nil {
-		log.Printf("[REQUEST-ERROR] update-FirewallRule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-FirewallRule failed: %s", err)
 	}
 
 	return
@@ -105,7 +105,7 @@ func (f *FirewallRule) Delete() (err error) {
 	path := fmt.Sprintf("v1/firewall/%s/rule/%s", f.TemplateId, f.ID)
 
 	if err = f.manager.Delete(path, Defaults(), nil); err != nil {
-		log.Printf("[REQUEST-ERROR] delete-FirewallRule was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] delete-FirewallRule failed: %s", err)
 	}
 
 	return

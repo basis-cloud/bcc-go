@@ -19,7 +19,7 @@ func (m *Manager) GetClients(extraArgs ...Arguments) (clients []*Client, err err
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &clients); err != nil {
-		log.Printf("[REQUEST-ERROR] get-clients was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-client list failed: %s", err)
 	} else {
 		for i := range clients {
 			clients[i].manager = m
@@ -33,7 +33,7 @@ func (m *Manager) GetClient(id string) (client *Client, err error) {
 	path, _ := url.JoinPath("v1/client", id)
 
 	if err = m.Get(path, Defaults(), &client); err != nil {
-		log.Printf("[REQUEST-ERROR] get-client with id='%s' was failed: %s", id, err)
+		log.Printf("[REQUEST-ERROR] get-client with id='%s' failed: %s", id, err)
 	} else {
 		client.manager = m
 	}

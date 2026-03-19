@@ -90,7 +90,7 @@ func (m *Manager) GetLoadBalancers(extraArgs ...Arguments) (lbaasList []*LoadBal
 	args.merge(extraArgs)
 
 	if err = m.GetItems(path, args, &lbaasList); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-lbaas was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-lbaas list failed: %s", err)
 	} else {
 		for i := range lbaasList {
 			lbaasList[i].manager = m
@@ -118,7 +118,7 @@ func (m *Manager) GetLoadBalancer(id string) (lbaas *LoadBalancer, err error) {
 	path, _ := url.JoinPath("v1/lbaas", id)
 
 	if err = m.Get(path, Defaults(), &lbaas); err != nil {
-		log.Printf("[REQUEST-ERROR]: get-lbaas was failed: %s", err)
+		log.Printf("[REQUEST-ERROR]: get-lbaas failed: %s", err)
 	} else {
 		lbaas.manager = m
 		lbaas.Port.manager = m
@@ -171,7 +171,7 @@ func (lb *LoadBalancer) Create() (err error) {
 		}
 	}
 	if err = lb.manager.Request("POST", path, lbCreate, &lb); err != nil {
-		log.Printf("[REQUEST-ERROR] lbaas.create was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-lbaas via lbaas failed: %s", err)
 	}
 
 	return
@@ -215,7 +215,7 @@ func (v Vdc) CreateLoadBalancer(lb *LoadBalancer) (err error) {
 	}
 
 	if err = lb.manager.Request("POST", path, lbCreate, &lb); err != nil {
-		log.Printf("[REQUEST-ERROR] create-lbaas was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-lbaas via vdc failed: %s", err)
 	} else {
 		lb.manager = v.manager
 	}
@@ -245,7 +245,7 @@ func (lb *LoadBalancer) Update() (err error) {
 		}
 	}
 	if err = lb.manager.Request("PUT", path, args, lb); err != nil {
-		log.Printf("[REQUEST-ERROR] update-lbaas was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-lbaas failed: %s", err)
 	} else {
 		err = lb.WaitLock()
 	}
@@ -253,10 +253,13 @@ func (lb *LoadBalancer) Update() (err error) {
 	return
 }
 
-func (lb *LoadBalancer) Delete() error {
+func (lb *LoadBalancer) Delete() (err error) {
 	path, _ := url.JoinPath("v1/lbaas", lb.ID)
-	return lb.manager.Delete(path, Defaults(), nil)
+	if err = lb.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-lbaas failed: %s", err)
+	}
 
+	return
 }
 
 func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerPool, err error) {
@@ -265,7 +268,7 @@ func (lb *LoadBalancer) GetPools(extraArgs ...Arguments) (pools []*LoadBalancerP
 	args.merge(extraArgs)
 
 	if err = lb.manager.GetSubItems(path, args, &pools); err != nil {
-		log.Printf("[REQUEST-ERROR] get-lbaas-pools was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-lbaas-pools failed: %s", err)
 	}
 
 	return
@@ -275,7 +278,7 @@ func (lb *LoadBalancer) GetLoadBalancerPool(id string) (lbaas_pool LoadBalancerP
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
 
 	if err = lb.manager.Get(path, Defaults(), &lbaas_pool); err != nil {
-		log.Printf("[REQUEST-ERROR] get-lbaas-pool was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] get-lbaas-pool failed: %s", err)
 	} else {
 		lbaas_pool.manager = lb.manager
 	}
@@ -318,7 +321,7 @@ func (lb *LoadBalancer) CreatePool(pool *LoadBalancerPool) (err error) {
 	}
 
 	if err = lb.manager.Request("POST", path, args, &pool); err != nil {
-		log.Printf("[REQUEST-ERROR] create-lbaas-pool was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] create-lbaas-pool failed: %s", err)
 	}
 
 	return
@@ -362,34 +365,37 @@ func (lb *LoadBalancer) UpdatePool(pool *LoadBalancerPool) (err error) {
 	}
 
 	if err := lb.manager.Request("PUT", path, lbCreatePool, &pool); err != nil {
-		log.Printf("[REQUEST-ERROR] update-lbaas-pool was failed: %s", err)
+		log.Printf("[REQUEST-ERROR] update-lbaas-pool failed: %s", err)
 	}
 
 	return
 }
 
-func (lb *LoadBalancer) DeletePools() error {
+func (lb *LoadBalancer) DeletePools() (err error) {
 	pools, err := lb.GetPools()
 	if err != nil {
-		return err
-	}
-	for _, pool := range pools {
-		err = lb.DeletePool(pool.ID)
-		if err != nil {
-			return err
+		log.Printf("[REQUEST-ERROR] get-lbaasPool list for deleate failed: %s", err)
+	} else {
+		for _, pool := range pools {
+			if err = lb.DeletePool(pool.ID); err != nil {
+				log.Printf("[REQUEST-ERROR] delete-lbaasPool failed: %s", err)
+				break
+			} else {
+				lb.WaitLock()
+			}
 		}
-		lb.WaitLock()
 	}
-	return nil
+
+	return
 }
 
-func (lb *LoadBalancer) DeletePool(id string) error {
+func (lb *LoadBalancer) DeletePool(id string) (err error) {
 	path := fmt.Sprintf("v1/lbaas/%s/pool/%s", lb.ID, id)
-	if err := lb.manager.Delete(path, Defaults(), nil); err != nil {
-		return err
+	if err = lb.manager.Delete(path, Defaults(), nil); err != nil {
+		log.Printf("[REQUEST-ERROR] delete-lbaasPool failed: %s", err)
 	}
 
-	return nil
+	return
 }
 
 func (lb LoadBalancer) WaitLock() error {
