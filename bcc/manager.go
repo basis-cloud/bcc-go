@@ -177,7 +177,7 @@ func (m *Manager) WithContext(ctx context.Context) *Manager {
 }
 
 func (m *Manager) Request(method string, path string, args interface{}, target interface{}) error {
-	m.log("[request-info] method:%s path:%s payload:%s", method, path, args)
+	m.log("[request-info] method: %s path: %s payload: %s", method, path, args)
 
 	res, err := json.Marshal(args)
 	if err != nil {

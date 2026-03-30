@@ -54,6 +54,7 @@ func (m *Manager) GetAffinityGroup(id string) (affinityGroup *AffinityGroup, err
 		log.Printf("[REQUEST-ERROR] get-affinityGroup failed: %s", err)
 	} else {
 		affinityGroup.Vdc.manager = m
+		affinityGroup.manager = m
 	}
 
 	return

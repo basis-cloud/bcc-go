@@ -59,6 +59,18 @@ func loadFile(file string) ([]byte, error) {
 	}
 }
 
+type VmMetadata struct {
+	manager *Manager
+	ID      string        `json:"id"`
+	Field   TemplateField `json:"field"`
+	Value   string        `json:"value"`
+}
+
+func NewVmMetadata(field TemplateField, value string) VmMetadata {
+	m := VmMetadata{Field: field, Value: value}
+	return m
+}
+
 // From https://github.com/aws/aws-sdk-go/blob/main/aws/context_sleep.go
 
 // SleepWithContext will wait for the timer duration to expire, or the context
